@@ -1,0 +1,4 @@
+# Additive bundle: does not override any host, Kiva or bili row.
+- insert:
+    - id: local-context-monitor
+      name: '@local/dsh-context-monitor'

@@ -1,0 +1,10 @@
+node_modules/
+*.tgz
+artifacts/
+*.log
+# Local-only diagnostic; not part of public source or release assets.
+scripts/inspect-live-compaction.mjs
+.env
+.env.*
+*.jsonl
+*.zstd

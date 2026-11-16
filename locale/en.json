@@ -1,0 +1,1 @@
+{"meta":{"title":"Context monitor","description":"Read-only DSH context estimates, provider usage and cache-read trends, and native compaction structure. Optional billion-context-dsh ACP detection safely falls back to generic telemetry; never changes compaction or model requests."}}

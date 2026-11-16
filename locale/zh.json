@@ -1,0 +1,1 @@
+{"meta":{"title":"上下文监控","description":"只读查看 DSH 上下文水位估算、请求 usage 与缓存读取比例趋势、原生压缩结构。可选识别 billion-context-dsh ACP；缺失时保留通用监控，不修改压缩逻辑或模型请求。"}}
