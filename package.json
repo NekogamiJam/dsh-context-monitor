@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-context-monitor",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "description": "Read-only context, compaction structure and provider cache telemetry for DSH, with optional billion-context-dsh ACP integration.",
   "type": "module",
@@ -40,7 +40,7 @@
   ],
   "engines": {
     "node": ">=22",
-    "dsh": "0.2.2-rc.3"
+    "dsh": ">=0.2.2-rc.1 <0.2.3-0"
   },
   "dependencies": {
     "zod": "4.6.6"
@@ -62,5 +62,8 @@
         "@deepseek-ai/dsh-api-remotes"
       ]
     }
+  },
+  "devDependencies": {
+    "semver": "7.8.5"
   }
 }

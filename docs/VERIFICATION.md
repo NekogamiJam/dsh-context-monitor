@@ -2,7 +2,8 @@
 
 ## Supported environment
 
-- Implementation targets DSH **0.2.2-rc.3**.
+- Declared DSH range: **`>=0.2.2-rc.1 <0.2.3-0`**. Only **0.2.2-rc.3** was exercised locally. rc.1 / rc.2 were statically reviewed, not runtime-tested; later 0.2.2 RC/stable builds are conditional untested candidates. See [COMPATIBILITY.md](COMPATIBILITY.md) for evidence and exclusions.
+- Plugin 0.1.5 passes **75** model, contract, layout, inventory and semver tests plus JavaScript syntax checks. The semver tests use ordinary prerelease matching, not `includePrerelease`; earlier branches and 0.2.3 prereleases are explicitly rejected.
 - Optional ACP metadata adapter: **billion-context-dsh v0.2.272**, ledger marker version 1.
 - Generic context and usage telemetry remains available without that ACP plugin. Inventory failures show an explicit unknown reason rather than claiming that a plugin is active.
 

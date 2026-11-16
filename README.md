@@ -1,6 +1,12 @@
 # 上下文监控 / DSH context monitor
 
-独立本地插件 **`@local/dsh-context-monitor 0.1.4`**。适配安装版 DSH **0.2.2-rc.3**；`billion-context-dsh v0.2.272` 是可选观察对象，不是运行依赖。
+独立插件 **`@local/dsh-context-monitor 0.1.5`**。DSH 声明范围 **`>=0.2.2-rc.1 <0.2.3-0`**；`billion-context-dsh v0.2.272` 是可选观察对象，不是运行依赖。
+
+## DSH 版本兼容性
+
+**仅 0.2.2-rc.3 经过本机运行验证。** 0.2.2-rc.1 / rc.2 已静态核对关键宿主和客户端契约，**未实测**。后续同一 0.2.2 版本线的 RC 与正式版按契约延续的假设放行，**未测试、未逐版审查**；正式版在本次调查时尚未发布。
+
+不纳入 0.2.1 及更早、0.2.2 alpha/beta、0.2.3（含预发布）及更高版本。较旧的投影 API 不支持 `wire.summary: false`，会将本插件的大块监控数据带入会话列表摘要；不是简单放宽范围就能安全支持。完整版本矩阵、证据链接、降级行为见 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)。本声明只针对监控插件，不覆盖被监测压缩后端自身的版本要求。
 
 ## 用法与功能
 
@@ -11,7 +17,7 @@
 在 DSH 的插件管理器中添加以下 GitHub 源（已包含前端产物，无需构建脚本）：
 
 ```text
-github:NekogamiJam/dsh-context-monitor#v0.1.4
+github:NekogamiJam/dsh-context-monitor#v0.1.5
 ```
 
 也可从 [GitHub Releases](https://github.com/NekogamiJam/dsh-context-monitor/releases) 选择预打包 `.tgz`。包名保留 `@local/dsh-context-monitor` 以兼容既有本地安装；`private: true` 仅阻止意外 npm 发布，不妨碍 GitHub 或 tarball 安装。未发布 npm。
@@ -58,7 +64,7 @@ npm test
 npm run check
 ```
 
-只依赖固定版本 `zod 4.6.6`，与当前安装版宿主所用版本一致；无构建脚本、无强制 peer 安装或版本豁免。`client.js` 是 DSH ModuleLoader lazy factory，React 从宿主表获取，无第二份 React、CDN 或 iframe。
+生产依赖仅固定版本 `zod 4.6.6`，与已运行验证的宿主版本一致；开发测试另用 `semver 7.8.5` 校验预发布范围。无构建脚本、无强制 peer 安装或版本豁免。`client.js` 是 DSH ModuleLoader lazy factory，React 从宿主表获取，无第二份 React、CDN 或 iframe。
 
 通过插件管理器安装此目录（不在 profile 手工运行 npm/pnpm）。这是一个 additive bundle，只新增 `local-context-monitor`，不覆盖任何出厂、billion-context-dsh 或 bili 条目。初次安装可以 HMR 激活，但仍需刷新既有页面加载 Client；替换已加载版本应按宿主结果重启，不承诺修改文件自动热更新。
 
