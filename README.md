@@ -1,6 +1,6 @@
 # 上下文监控 / DSH context monitor
 
-独立插件 **`@local/dsh-context-monitor 0.1.5`**。DSH 声明范围 **`>=0.2.2-rc.1 <0.2.3-0`**；`billion-context-dsh v0.2.272` 是可选观察对象，不是运行依赖。
+独立插件 **`@local/dsh-context-monitor 0.1.6`**。DSH 声明范围 **`>=0.2.2-rc.1 <0.2.3-0`**；`billion-context-dsh v0.2.272` 是可选观察对象，不是运行依赖。
 
 ## DSH 版本兼容性
 
@@ -17,7 +17,7 @@
 在 DSH 的插件管理器中添加以下 GitHub 源（已包含前端产物，无需构建脚本）：
 
 ```text
-github:NekogamiJam/dsh-context-monitor#v0.1.5
+github:NekogamiJam/dsh-context-monitor#v0.1.6
 ```
 
 也可从 [GitHub Releases](https://github.com/NekogamiJam/dsh-context-monitor/releases) 选择预打包 `.tgz`。包名保留 `@local/dsh-context-monitor` 以兼容既有本地安装；`private: true` 仅阻止意外 npm 发布，不妨碍 GitHub 或 tarball 安装。未发布 npm。
@@ -28,6 +28,12 @@ github:NekogamiJam/dsh-context-monitor#v0.1.5
 - 趋势：总输入蓝线、缓存读取半透明蓝色面积、已提交的原生压缩检查点标记、缓存读取 token 比例；**默认最近 600 个样本**，也可选最近 60 / 180 个样本。
 - 压缩结构：T1/T2/T3、持久 compaction ID、billion-context-dsh bN 引用、来源块关系、源 seq、替换规模、摘要粗估、事务和表层状态；支持主题／引用筛选。
 - 安全降级：billion-context-dsh 不存在或未启用时继续显示通用 DSH 指标；inventory 失败显示未知；监控投影缺失显示提示，不影响聊天。
+
+### 界面示意
+
+![上下文监控的去敏界面示意图，所有数字和记录均为虚构样例](docs/context-monitor-preview.svg)
+
+> 这是按当前界面布局绘制的静态示意图，并非用户会话截图；图中数值、趋势线、检查点与压缩记录均为虚构内容，不含账号、路径、会话标识或真实请求数据。
 
 这里只展示脱离正文的少量元数据，不提供压缩／解压按钮，不调用 provider，不读取旧 bili 数据库，不向 system prompt 注入任何内容。没有改动 billion-context-dsh、旧 bili 或 DSH 本体。
 
@@ -74,4 +80,4 @@ npm run check
 
 实现／测试／安装记录见 [docs/VERIFICATION.md](docs/VERIFICATION.md)。截至编写初稿，尚未宣称视觉验收或 fork 首请求问题修复。本监控插件也不是旧代理迁移器；不能拿面板中的块数作为成本故障已经修复的证明。
 
-界面参考用户提供的 billion-context 仪表盘布局，但未复制其源码、截图或第三方品牌标识。图标是原创轻量折线图 SVG；无单独详情配图，插件管理器按 README 回退展示使用说明。
+界面参考用户提供的 billion-context 仪表盘布局，但未复制其源码、截图或第三方品牌标识。README 中的界面示意为原创 SVG，所有数据虚构；图标是原创轻量折线图 SVG。插件管理器无单独详情配图，按 README 回退展示使用说明。

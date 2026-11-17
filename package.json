@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-context-monitor",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "description": "Read-only context, compaction structure and provider cache telemetry for DSH, with optional billion-context-dsh ACP integration.",
   "type": "module",

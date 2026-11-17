@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1000" viewBox="0 0 1440 1000" role="img" aria-labelledby="title desc">
+  <title id="title">上下文监控界面示意</title>
+  <desc id="desc">虚构数据演示上下文水位、缓存读取比例和压缩结构，不含真实会话信息。</desc>
+  <defs>
+    <linearGradient id="readFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3978f6" stop-opacity=".26"/><stop offset="1" stop-color="#3978f6" stop-opacity=".025"/></linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%"><feDropShadow dx="0" dy="3" stdDeviation="8" flood-color="#25365b" flood-opacity=".07"/></filter>
+    <style>
+      text{font-family:Inter,"Segoe UI",Arial,sans-serif;fill:#202b3b} .muted{fill:#738096} .tiny{font-size:13px}.small{font-size:15px}.body{font-size:17px}.heading{font-size:21px;font-weight:650}.number{font-size:27px;font-weight:700}.card{fill:#fff;stroke:#e2e7ef;stroke-width:1}.axis{stroke:#e9edf3;stroke-width:1}.blue{stroke:#3978f6;fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}.red{stroke:#df6973;stroke-width:2;stroke-dasharray:6 6}.pill{fill:#edf3ff}.pillText{fill:#285fca;font-size:13px;font-weight:600}
+    </style>
+  </defs>
+  <rect width="1440" height="1000" fill="#f4f6fa"/>
+  <rect x="44" y="34" width="1352" height="932" rx="24" fill="#fafbfc" stroke="#dfe5ed"/>
+  <rect x="44" y="34" width="1352" height="68" rx="24" fill="#fff"/>
+  <path d="M44 78v24h1352V78" fill="#fff"/>
+  <circle cx="76" cy="68" r="7" fill="#f17c78"/><circle cx="99" cy="68" r="7" fill="#f4c85f"/><circle cx="122" cy="68" r="7" fill="#69c786"/>
+  <text x="170" y="75" class="small muted">对话视图</text>
+  <rect x="269" y="47" width="110" height="42" rx="12" fill="#edf3ff"/>
+  <text x="292" y="74" class="small" style="font-weight:650;fill:#285fca">上下文</text>
+  <rect x="1151" y="51" width="203" height="34" rx="17" fill="#edf7f1"/>
+  <circle cx="1171" cy="68" r="5" fill="#48a875"/><text x="1185" y="73" class="tiny" style="fill:#347e58">只读监控 · 示意数据</text>
+
+  <text x="88" y="153" style="font-size:29px;font-weight:700">上下文</text>
+  <text x="88" y="183" class="body muted">只读监控 · 不改变压缩、缓存或模型请求</text>
+  <text x="1350" y="158" text-anchor="end" class="small muted">本图为界面示意，全部数字为虚构样例</text>
+
+  <rect x="88" y="211" width="1264" height="74" rx="15" class="card" filter="url(#shadow)"/>
+  <text x="112" y="242" class="small muted">当前上下文估算</text>
+  <text x="112" y="269" class="heading">42,180 <tspan class="small muted" style="font-weight:400">/ 128,000 · 33%</tspan></text>
+  <rect x="438" y="244" width="385" height="12" rx="6" fill="#edf0f5"/><rect x="438" y="244" width="127" height="12" rx="6" fill="#3978f6"/>
+  <text x="870" y="242" class="small muted">最近请求输入</text><text x="870" y="269" class="heading">3,240 <tspan class="tiny muted" style="font-weight:400">provider usage 示例值</tspan></text>
+  <text x="1196" y="242" class="small muted">已记录样本</text><text x="1196" y="269" class="heading">48</text>
+
+  <rect x="88" y="309" width="1264" height="284" rx="16" class="card" filter="url(#shadow)"/>
+  <text x="116" y="350" class="heading">上下文水位变化</text>
+  <rect x="1168" y="326" width="152" height="36" rx="9" fill="#f6f8fb" stroke="#e3e8ef"/>
+  <text x="1192" y="350" class="small">最近 60 个样本 ▾</text>
+  <text x="118" y="399" class="tiny muted">80k</text><text x="118" y="454" class="tiny muted">60k</text><text x="118" y="509" class="tiny muted">40k</text><text x="118" y="564" class="tiny muted">20k</text>
+  <line x1="175" y1="394" x2="1317" y2="394" class="axis"/><line x1="175" y1="449" x2="1317" y2="449" class="axis"/><line x1="175" y1="504" x2="1317" y2="504" class="axis"/><line x1="175" y1="559" x2="1317" y2="559" class="axis"/>
+  <path d="M180 535 L260 522 L340 525 L420 496 L500 505 L580 478 L660 487 L740 468 L820 480 L900 442 L980 452 L1060 419 L1140 431 L1220 396 L1312 407" class="blue"/>
+  <line x1="900" y1="389" x2="900" y2="565" class="red"/>
+  <circle cx="900" cy="442" r="5" fill="#df6973"/>
+  <text x="180" y="582" class="tiny muted">较早</text><text x="1312" y="582" text-anchor="end" class="tiny muted">最近</text>
+  <line x1="1030" y1="377" x2="1060" y2="377" class="blue"/><text x="1068" y="382" class="tiny muted">总输入</text><line x1="1152" y1="377" x2="1181" y2="377" class="red"/><text x="1190" y="382" class="tiny muted">压缩检查点</text>
+
+  <rect x="88" y="617" width="1264" height="190" rx="16" class="card" filter="url(#shadow)"/>
+  <text x="116" y="657" class="heading">缓存读取比例变化</text>
+  <rect x="1070" y="634" width="250" height="34" rx="17" class="pill"/>
+  <text x="1092" y="656" class="pillText">窗口内缓存读取比例　68%</text>
+  <text x="116" y="697" class="small muted">缓存读取 / prompt input · token 比例，并非请求命中率或费用节省</text>
+  <text x="118" y="741" class="tiny muted">100%</text><text x="118" y="781" class="tiny muted">0%</text>
+  <line x1="175" y1="737" x2="1317" y2="737" class="axis"/><line x1="175" y1="779" x2="1317" y2="779" class="axis"/>
+  <path d="M180 778 L180 758 L260 749 L340 754 L420 739 L500 744 L580 730 L660 736 L740 720 L820 727 L900 709 L980 715 L1060 702 L1140 709 L1220 694 L1312 701 L1312 778 Z" fill="url(#readFill)"/>
+  <path d="M180 758 L260 749 L340 754 L420 739 L500 744 L580 730 L660 736 L740 720 L820 727 L900 709 L980 715 L1060 702 L1140 709 L1220 694 L1312 701" class="blue"/>
+
+  <rect x="88" y="831" width="1264" height="103" rx="16" class="card" filter="url(#shadow)"/>
+  <text x="116" y="871" class="heading">压缩结构</text>
+  <text x="116" y="904" class="small muted">T1 · 1 条摘要记录 · 当前保留</text>
+  <rect x="510" y="850" width="790" height="57" rx="10" fill="#f8f9fb"/>
+  <text x="530" y="875" class="small" style="font-weight:600">示例块 · 主题摘要</text><text x="530" y="897" class="tiny muted">源范围与事务状态由本地投影显示；示意内容非真实会话</text>
+  <text x="1322" y="955" text-anchor="end" class="tiny muted">示意图 · 无真实会话、账号、路径或请求数据</text>
+</svg>
