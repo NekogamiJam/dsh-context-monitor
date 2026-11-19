@@ -2,7 +2,8 @@
 
 ## Supported environment
 
-- Declared DSH range: **`>=0.2.2-rc.1 <0.2.3-0`**. Only **0.2.2-rc.3** was exercised locally. rc.1 / rc.2 were statically reviewed, not runtime-tested; later 0.2.2 RC/stable builds are conditional untested candidates. See [COMPATIBILITY.md](COMPATIBILITY.md) for evidence and exclusions.
+- Declared DSH range: **`>=0.2.2-rc.1 <0.2.3-0`**. Plugin 0.1.6 was exercised locally on **0.2.2-rc.3 and 0.2.2-rc.5**; the read-only monitor path operated normally on rc.5. rc.1 / rc.2 were source-reviewed, not runtime-tested; rc.4 and stable 0.2.2 were not runtime-tested. See [COMPATIBILITY.md](COMPATIBILITY.md) for scope and exclusions.
+- **Capability attribution:** the live T1 compaction observed on rc.5 was performed by the separately installed `billion-context-dsh v0.2.272` under a temporary version exemption. `dsh-context-monitor` is read-only: it observes host projections and optional backend metadata; it does not compress, decompress or search context. The backend smoke test does not validate fork-first-request compaction, restart recovery, or general Kiva compatibility.
 - Plugin **0.1.6** passes **77** model, contract, layout, inventory, semver, cache-row and README schematic checks plus JavaScript syntax checks. The semver tests use ordinary prerelease matching, not `includePrerelease`; earlier branches and 0.2.3 prereleases are explicitly rejected.
 - The README image is a hand-authored fictional SVG schematic, not a session screenshot; its data is illustrative and includes no user/session identifiers, paths or provider routes.
 - Optional ACP metadata adapter: **billion-context-dsh v0.2.272**, ledger marker version 1.

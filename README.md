@@ -4,7 +4,7 @@
 
 ## DSH 版本兼容性
 
-**仅 0.2.2-rc.3 经过本机运行验证。** 0.2.2-rc.1 / rc.2 已静态核对关键宿主和客户端契约，**未实测**。后续同一 0.2.2 版本线的 RC 与正式版按契约延续的假设放行，**未测试、未逐版审查**；正式版在本次调查时尚未发布。
+**DSH 0.2.2-rc.3 与 rc.5 均经过本机实测。** rc.5 上本监控插件的只读投影和界面路径运行正常。rc.1 / rc.2 仅做源码静态核对，未运行实测；rc.4 及同一版本线后续 RC／正式版仍未经实测。另一次在 rc.5 上的真实上下文压缩由可选后端 **billion-context-dsh** 执行，并非本监控插件的能力。本插件只观察用量／上下文投影及可选 ACP 状态／元数据，不执行压缩、解压或搜索。详细范围见 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)。
 
 不纳入 0.2.1 及更早、0.2.2 alpha/beta、0.2.3（含预发布）及更高版本。较旧的投影 API 不支持 `wire.summary: false`，会将本插件的大块监控数据带入会话列表摘要；不是简单放宽范围就能安全支持。完整版本矩阵、证据链接、降级行为见 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)。本声明只针对监控插件，不覆盖被监测压缩后端自身的版本要求。
 
@@ -39,7 +39,7 @@ github:NekogamiJam/dsh-context-monitor#v0.1.6
 
 ## 指标口径（重要）
 
-DSH 0.2.2-rc.3 的 TokenUsage 是互斥桶：
+DSH 0.2.2-rc.3 / rc.5 的 TokenUsage 是互斥桶：
 
 ```
 prompt input = inputTokens（未缓存）+ cacheReadTokens + cacheWriteTokens

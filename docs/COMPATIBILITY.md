@@ -8,12 +8,14 @@ Since plugin **0.1.5**:
 >=0.2.2-rc.1 <0.2.3-0
 ```
 
-- **DSH 0.2.2-rc.3: exercised locally.** Installed-host projection integration, ordinary UI use, and recognition of one committed native T1 block were checked. This is not a comprehensive browser, platform, fork-first-request, restart, or proxy-migration test.
+- **DSH 0.2.2-rc.3: exercised locally.** The monitor's installed-host projection integration and ordinary UI use were checked, including recognition of a committed T1 block produced by the separate `billion-context-dsh` backend. This is not a comprehensive browser, platform, fork-first-request, restart, or proxy-migration test.
+- **DSH 0.2.2-rc.5: the monitor was exercised locally in the live Desktop environment and its read-only monitoring path operated normally.** This confirms the monitor on rc.5 only; it does not mean the monitor performed a compaction or validate the optional backend's general compatibility.
+- **Separate backend check:** on rc.5, `billion-context-dsh v0.2.272` (after a temporary version exemption) performed one live T1 compaction, reporting about 19.8K tokens reclaimed. That behavior belongs to `billion-context-dsh`, not `dsh-context-monitor`; it was a smoke test, not restart or fork-first-provider-request E2E.
 - **DSH 0.2.2-rc.1 and 0.2.2-rc.2: source-reviewed candidates, NOT runtime-tested.** Their published sources expose the required projection, session hooks and conversation tab contract. No old host was installed or launched for this investigation.
-- **Later 0.2.2 release candidates and the eventual 0.2.2 stable: conditionally allowed, NOT tested or individually reviewed.** The range intentionally permits the same patch release line, assuming those public contracts remain compatible. Stable 0.2.2 was not present among the upstream tags or npm version lists inspected on 2026-11-16.
+- **DSH 0.2.2-rc.4 and the eventual 0.2.2 stable: NOT runtime-tested.** Their inclusion in the declared range is based on the same-patch-line contract assumption; they were not individually reviewed here.
 - **0.2.2 alpha/beta builds, versions below 0.2.2-rc.1, and 0.2.3 or newer (including its prereleases): outside the declared range.** No claim of support is made. Future release lines should be reviewed before widening again.
 
-中文摘要：目前只有 **0.2.2-rc.3 经过本机运行验证**；rc.1 / rc.2 仅做源码静态核对，未安装、未启动旧宿主。后续同一 0.2.2 版本线的 RC 与正式版只是保守预期兼容，不等于实测通过；0.2.2 正式版在本次调查时尚未发布。
+中文摘要：监控插件在 **0.2.2-rc.3 和 rc.5** 均有本机实测；rc.5 的只读监控路径运行正常。rc.1 / rc.2 仅静态核对，rc.4 和 0.2.2 正式版未经实测。另一次约 19.8K token 的 T1 压缩由 `billion-context-dsh v0.2.272` 在临时豁免后执行，**不是监控插件的压缩能力**。
 
 ## Why not declare every older version? / 为什么不无限向下兼容？
 
@@ -40,7 +42,7 @@ The installed upgrade-guide index for the rc.1-to-current interval was also revi
 
 ## Semver and fallback / 版本匹配与降级
 
-The lower comparator explicitly names the **0.2.2 prerelease tuple**. Tests use normal `semver.satisfies()` without `includePrerelease`: rc.1 / rc.2 / rc.3 and stable 0.2.2 match; 0.2.1-rc.5, 0.2.2-alpha.3 and 0.2.3-alpha.1 do not. A broad-looking range starting on an unrelated prerelease tuple is not equivalent.
+The lower comparator explicitly names the **0.2.2 prerelease tuple**. Tests use normal `semver.satisfies()` without `includePrerelease`: rc.1 / rc.2 / rc.3 / rc.4 and stable 0.2.2 match; the unchanged declared range also admits rc.5, which has now been exercised locally for the monitor's read-only path. 0.2.1-rc.5, 0.2.2-alpha.3 and 0.2.3-alpha.1 do not match. A broad-looking range starting on an unrelated prerelease tuple is not equivalent.
 
 The range is for this **monitor**, not a promise about billion-context-dsh's own engine constraints. ACP metadata support was reviewed with `billion-context-dsh v0.2.272` ledger version 1. Other backend releases are not runtime-verified here; unsupported metadata is shown as generic summary records.
 
