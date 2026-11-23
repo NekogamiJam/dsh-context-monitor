@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: '@local/dsh-context-monitor',
+  id: 'dsh-context-monitor',
   factory(require) {
     const React = require('react');
     const h = React.createElement;

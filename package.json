@@ -1,7 +1,10 @@
 {
-  "name": "@local/dsh-context-monitor",
-  "version": "0.1.6",
-  "private": true,
+  "name": "dsh-context-monitor",
+  "version": "0.1.7",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "description": "Read-only context, compaction structure and provider cache telemetry for DSH, with optional billion-context-dsh ACP integration.",
   "type": "module",
   "license": "MIT",

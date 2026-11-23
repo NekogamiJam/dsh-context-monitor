@@ -38,7 +38,7 @@ test('strict checkpoint schema rejects corrupt state and accepts all reducer var
 test('manifest exports all runtime resources and bundle is strictly additive', () => {
   const manifest = JSON.parse(readFileSync(new URL('package.json',root),'utf8'));
   for (const path of ['index.js','model.js','client.js','icon.svg','README.md','LICENSE','locale/zh.json','locale/en.json','cordis.patch.yml']) assert.ok(existsSync(new URL(path,root)),path);
-  assert.equal(manifest.name,'@local/dsh-context-monitor');
+  assert.equal(manifest.name,'dsh-context-monitor');
   assert.equal(manifest.dsh.client.immediately,true);
   assert.equal(manifest.scripts.prepare,undefined);
   assert.equal(manifest.dependencies['billion-context-dsh'],undefined);
@@ -52,7 +52,7 @@ test('client lazy module registers only with host ModuleLoader, no module side e
   const source=readFileSync(new URL('client.js',root),'utf8');
   let declaration;
   new vm.Script(source).runInNewContext({window:{__ModuleLoader__:{load(value){declaration=value;}}}});
-  assert.equal(declaration.id,'@local/dsh-context-monitor');
+  assert.equal(declaration.id,'dsh-context-monitor');
   assert.equal(typeof declaration.factory,'function');
   // Do not instantiate the React factory or emulate a DOM to fake a visual test.
   assert.doesNotMatch(source,/require\(['"]@deepseek-ai\//);

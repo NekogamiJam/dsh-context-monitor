@@ -1,6 +1,6 @@
 # 上下文监控 / DSH context monitor
 
-独立插件 **`@local/dsh-context-monitor 0.1.6`**。DSH 声明范围 **`>=0.2.2-rc.1 <0.2.3-0`**；`billion-context-dsh v0.2.272` 是可选观察对象，不是运行依赖。
+独立插件 **`dsh-context-monitor`**。DSH 声明范围 **`>=0.2.2-rc.1 <0.2.3-0`**；`billion-context-dsh v0.2.272` 是可选观察对象，不是运行依赖。
 
 ## DSH 版本兼容性
 
@@ -14,13 +14,13 @@
 
 ### 安装
 
-在 DSH 的插件管理器中添加以下 GitHub 源（已包含前端产物，无需构建脚本）：
+在 DSH 插件管理器中任选一种安装来源（均含前端产物，无需构建脚本）：
 
-```text
-github:NekogamiJam/dsh-context-monitor#v0.1.6
-```
+- **npm（推荐）：** `dsh-context-monitor`，或指定版本 `dsh-context-monitor@0.1.7`。
+- **GitHub 源码：** `github:NekogamiJam/dsh-context-monitor#v0.1.7`。
+- **GitHub 预打包文件：** [v0.1.7 安装包](https://github.com/NekogamiJam/dsh-context-monitor/releases/download/v0.1.7/dsh-context-monitor-0.1.7.tgz)。
 
-也可从 [GitHub Releases](https://github.com/NekogamiJam/dsh-context-monitor/releases) 选择预打包 `.tgz`。包名保留 `@local/dsh-context-monitor` 以兼容既有本地安装；`private: true` 仅阻止意外 npm 发布，不妨碍 GitHub 或 tarball 安装。未发布 npm。
+旧版包名为 `@local/dsh-context-monitor`；不会自动迁移到新包名。新旧包使用同一个插件行 ID，请勿并装。需要切换时，在插件管理器中移除旧 bundle，再安装新包；若宿主提示重启，按提示操作。移除旧 bundle 不会改写会话历史。
 
 
 - 概览：宿主累计输入、缓存读取和输出，监控投影记录的 usage 样本数。
