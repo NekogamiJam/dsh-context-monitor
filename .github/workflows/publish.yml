@@ -69,7 +69,11 @@ jobs:
           assert.equal(packed.version, pkg.version);
           assert.deepEqual(packed.files.map(f => f.path).sort(), [
             'LICENSE', 'README.md', 'client.js', 'cordis.patch.yml',
-            'docs/COMPATIBILITY.md', 'docs/VERIFICATION.md', 'docs/context-monitor-preview.svg',
+            'docs/BUILT-IN-ACP.md', 'docs/COMPATIBILITY.md', 'docs/DSH-PRESETS-LICENSE.txt', 'docs/VERIFICATION.md', 'docs/context-monitor-preview.svg',
+            'acp/config.js', 'acp/coordinator.js', 'acp/host.js', 'acp/preset.js',
+            'acp/vendor/engine.js', 'acp/vendor/index.js', 'acp/vendor/runtime.js',
+            ...['acp-kernel-MIT.txt', 'acp-kernel-PROVENANCE.md', 'acp-kernel-SNAPSHOT.md', 'adapter.patch',
+              'build-vendor.ps1', 'RECIPE.md', 'SOURCES.md', 'upstream-MIT.txt'].map(file => `acp/vendor/notices/${file}`),
             'icon.svg', 'index.js', 'locale/en.json', 'locale/zh.json', 'model.js', 'package.json',
           ].sort());
           const original = join(dir, packed.filename);

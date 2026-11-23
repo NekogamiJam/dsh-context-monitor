@@ -1,0 +1,9 @@
+# Isolated UI and fake-provider fixtures only; never apply to Desktop.
+# Disable all shipped model adapters so a stray composer submission cannot
+# use an inherited provider credential. The E2E fixture installs a local fake.
+- id: llm-pi-ai
+  disabled: true
+- id: llm-deepseek
+  disabled: true
+- id: llm-deepseek-account
+  disabled: true

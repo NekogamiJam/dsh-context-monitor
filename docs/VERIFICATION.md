@@ -1,6 +1,16 @@
 # Verification and privacy notes
 
-## Supported environment
+## v0.2.0 verification
+
+The monitoring projection is still read-only. A separate built-in engine provides ACP, with a profile-wide settings switch. Compatibility is restricted to rc.5. Prior v0.1.x Desktop tests below validate only the old monitoring integration, not the new engine or its settings UI. Automated integration fixtures use isolated profiles and synthetic data, not production sessions or real provider credentials.
+
+- The detached wiring fixture loads the installed Cordis and Typert modules and checks strict status registration. A separate npm-installed rc.5 Web process, home and profile exercised all four concurrent preset scopes, the strict status Gateway, and real revisioned settings writes. `/compact` is absent from the Host command catalog while ACP is on and reaches stock when off; `/acp-prune status` works when active. A switch issued during a live turn remained pending until it settled, without restarting the Host.
+- The isolated Web fixture captured requests at a loopback HTTP fake provider. Model-driven `compress` committed a T1 checkpoint and hid its bookkeeping tool pair. The real ordinary fork's first request and the first request after reopening the fork in a new JSONL-backed process included the summary and excluded its unique original marker. Model `decompress`, `search_context` and `acp_status` worked after reopening.
+- Additional loopback checks exercised T2 and T3 distillation and recovery through the parent links, one durable reduction and retry after provider-confirmed overflow, and a recognized invalid ACP ledger that was refused before provider dispatch.
+- The isolated CLI accepted, installed and loaded the package without a version exemption or force flag. Its separate profile package manager reported missing peer warnings in profile `node_modules`; at runtime DSH resolves those peers from the matching installation.
+- In Edge on the isolated Web host, the settings section rendered four cards in a 2×2 grid. Selecting `aggressive` set the three expected values, Apply showed success, and the Advanced section showed its caution when expanded. The command menu showed all four ACP entries together with their descriptions, and picking `compress` filled the draft without submitting it. This is a basic desktop browser check, not exhaustive mobile, multi-tab, cancellation or multi-tool coverage. Legacy proxy migration is not supported.
+
+## Historical v0.1.x verification
 
 - Declared DSH range: **`>=0.2.2-rc.1 <0.2.3-0`**. Plugin 0.1.6 was exercised locally on **0.2.2-rc.3 and 0.2.2-rc.5**; the read-only monitor path operated normally on rc.5. rc.1 / rc.2 were source-reviewed, not runtime-tested; rc.4 and stable 0.2.2 were not runtime-tested. See [COMPATIBILITY.md](COMPATIBILITY.md) for scope and exclusions.
 - **Capability attribution:** the live T1 compaction observed on rc.5 was performed by the separately installed `billion-context-dsh v0.2.272` under a temporary version exemption. `dsh-context-monitor` is read-only: it observes host projections and optional backend metadata; it does not compress, decompress or search context. The backend smoke test does not validate fork-first-request compaction, restart recovery, or general Kiva compatibility.
@@ -29,7 +39,7 @@ The monitor records at most 600 usage samples and 400 summary records. Nested fo
 
 ## Privacy and publication boundary
 
-- The plugin does not transmit telemetry to third parties, call a model, alter a prompt, migrate a database, or publish conversation data.
+- The monitoring view does not transmit telemetry to third parties, call a model, change a prompt, or publish conversation data. The optional engine can add ACP guidance and retry a provider-confirmed overflow through DSH when enabled. Neither component imports or migrates legacy proxy state.
 - The host projection sends selected metadata to the authenticated DSH client: usage, route identifiers, block references, and bounded topics. Topics can contain sensitive information; use care when sharing screenshots.
 - Git publication contains only this plugin's source, synthetic tests, metadata and public documentation. Dependencies, personal workspace archives, diagnostic logs, attachments, local deployment records and Git credentials are excluded.
 - Local live-session diagnostics are excluded from Git and release assets. No installation or normal plugin operation runs diagnostic scripts.

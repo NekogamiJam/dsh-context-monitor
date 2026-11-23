@@ -1,6 +1,12 @@
 # DSH compatibility / DSH 版本兼容性
 
-## Declared range / 声明范围
+## v0.2.0: exact host revision
+
+The built-in ACP changes host preset composition and adds a settings and command adapter. Its declaration is **DSH 0.2.2-rc.5 only**, for the four shipped Desktop/Web presets, with **Node ≥24.9**. A version exemption is not a supported installation path. See [built-in ACP](BUILT-IN-ACP.md) for setup and boundaries.
+
+The remainder of this document describes the historical **read-only v0.1.x** monitor and does not widen v0.2.0's compatibility declaration.
+
+## v0.1.x: declared range / 旧版声明范围
 
 Since plugin **0.1.5**:
 

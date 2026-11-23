@@ -1,11 +1,11 @@
 {
   "name": "dsh-context-monitor",
-  "version": "0.1.7",
+  "version": "0.2.0",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
-  "description": "Read-only context, compaction structure and provider cache telemetry for DSH, with optional billion-context-dsh ACP integration.",
+  "description": "DSH context and cache telemetry with a profile-wide, optional built-in Active Context Pruning engine.",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -26,6 +26,8 @@
   ],
   "exports": {
     ".": "./index.js",
+    "./acp": "./acp/host.js",
+    "./acp/preset": "./acp/preset.js",
     "./client": "./client.js",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
@@ -39,18 +41,36 @@
     "icon.svg",
     "README.md",
     "docs",
+    "acp/config.js",
+    "acp/coordinator.js",
+    "acp/host.js",
+    "acp/preset.js",
+    "acp/vendor/index.js",
+    "acp/vendor/engine.js",
+    "acp/vendor/runtime.js",
+    "acp/vendor/notices",
     "LICENSE"
   ],
   "engines": {
-    "node": ">=22",
-    "dsh": ">=0.2.2-rc.1 <0.2.3-0"
+    "node": ">=24.9",
+    "dsh": "0.2.2-rc.5"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "3.19.0",
+    "@deepseek-ai/dsh-compaction": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-compaction-basic": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-typert-protocol": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-session": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-llm": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-tools": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-settings": "0.2.2-rc.5"
   },
   "dependencies": {
     "zod": "4.6.6"
   },
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "check": "node --check index.js && node --check model.js && node --check client.js"
+    "check": "node --check index.js && node --check model.js && node --check client.js && node --check acp/config.js && node --check acp/coordinator.js && node --check acp/host.js && node --check acp/preset.js && node --check acp/vendor/engine.js"
   },
   "dsh": {
     "bundle": {
@@ -62,6 +82,9 @@
       "inject": [
         "@deepseek-ai/dsh-client-ui-conversation",
         "@deepseek-ai/dsh-client-ui-session",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-commands",
+        "@deepseek-ai/dsh-client-connection",
         "@deepseek-ai/dsh-api-remotes"
       ]
     }

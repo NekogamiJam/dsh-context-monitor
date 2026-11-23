@@ -31,3 +31,11 @@ test('capacity and dates use wrapping HTML outside the SVG plot', () => {
   assert.match(chart, /h\('time'/);
   assert.match(css, /\.dcm-chart-times time\{[^}]*overflow-wrap:anywhere/);
 });
+
+test('monitor cards share one bounded grid column and tables scroll within it', () => {
+  assert.match(css, /\.dcm \.dcm-inner\{inline-size:100%;min-inline-size:0;display:grid;grid-template-columns:minmax\(0,1fr\)\}/);
+  assert.match(css, /\.dcm-inner>\*\{min-inline-size:0\}/);
+  assert.match(css, /\.dcm-inner>\.dcm-card\{inline-size:100%;max-inline-size:100%;justify-self:stretch\}/);
+  assert.match(css, /\.dcm-tablewrap\{inline-size:100%;min-inline-size:0;max-inline-size:100%;overflow-x:auto\}/);
+  assert.match(css, /\.dcm-tablewrap>table\{inline-size:100%;min-inline-size:38rem\}/);
+});

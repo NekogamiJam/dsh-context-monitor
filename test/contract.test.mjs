@@ -35,7 +35,7 @@ test('strict checkpoint schema rejects corrupt state and accepts all reducer var
   assert.equal(JSON.stringify(state).includes('"text":"summary"'),false);
 });
 
-test('manifest exports all runtime resources and bundle is strictly additive', () => {
+test('manifest exports runtime resources and scopes ACP to the four Web presets', () => {
   const manifest = JSON.parse(readFileSync(new URL('package.json',root),'utf8'));
   for (const path of ['index.js','model.js','client.js','icon.svg','README.md','LICENSE','locale/zh.json','locale/en.json','cordis.patch.yml']) assert.ok(existsSync(new URL(path,root)),path);
   assert.equal(manifest.name,'dsh-context-monitor');
@@ -43,9 +43,14 @@ test('manifest exports all runtime resources and bundle is strictly additive', (
   assert.equal(manifest.scripts.prepare,undefined);
   assert.equal(manifest.dependencies['billion-context-dsh'],undefined);
   const patch = readFileSync(new URL('cordis.patch.yml',root),'utf8');
-  assert.equal((patch.match(/- id:/g)||[]).length,1);
   assert.match(patch,/id: local-context-monitor/);
-  assert.doesNotMatch(patch,/disabled:|config:/);
+  for(const id of ['standard','ptc','minimal','cordis']) {
+    assert.match(patch,new RegExp(`^\u002d id: preset-${id}$`,'m'));
+    assert.equal(patch.split(`- id: context-monitor-acp-${id}`).length,2);
+  }
+  assert.doesNotMatch(patch,/- id: (?:command-compact|compaction-basic)\s*$/m);
+  assert.match(manifest.exports['./acp'],/acp\/host\.js$/);
+  assert.match(manifest.exports['./acp/preset'],/acp\/preset\.js$/);
 });
 
 test('client lazy module registers only with host ModuleLoader, no module side effects', () => {
@@ -58,7 +63,7 @@ test('client lazy module registers only with host ModuleLoader, no module side e
   assert.doesNotMatch(source,/require\(['"]@deepseek-ai\//);
   assert.doesNotMatch(source,/document\.body|setInterval\(|fetch\(/);
   assert.match(source,/props\.useProjection\('contextPressure'\)/);
-  assert.match(source,/ctx\.get\('remote\.pluginInventory'\)/);
+  assert.match(source,/contextMonitorAcp\/sessionStatus/);
 });
 
 test('icon is self-contained original SVG and locale display metadata exists', () => {

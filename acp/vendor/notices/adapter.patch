@@ -1,0 +1,828 @@
+diff --git a/src/index.ts b/src/index.ts
+index 1e3ba7e..ec76e69 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -35,7 +35,7 @@ import {
+   type CompactionTrigger,
+   type ManualCompactAgentContext,
+ } from '@deepseek-ai/dsh-compaction'
+-import { createCore, setDocCacheCap, type CompressionCore } from 'acp-kernel'
++import { createCore, defaultConfig, setDocCacheCap, validateConfig as validateKernelConfig, type CompressionCore } from 'acp-kernel'
+ import type { Agent } from '@deepseek-ai/dsh-agent'
+ import type { Session } from '@deepseek-ai/dsh-session'
+ import { CONTEXT_WINDOW_EXCEEDED_CODE } from '@deepseek-ai/dsh-llm'
+@@ -50,6 +50,7 @@ import { DEFAULT_CONTEXT_WINDOW, probeModelWindow, projectedContextWindow, route
+ import {
+   buildCompressibleSeqRanges,
+   deferCompressPairHide,
++  hideCompressToolPair,
+   runCompactionTransaction,
+   shadowedSeqsOf,
+   stripOrphanedSurfaceToolMessages,
+@@ -155,7 +156,14 @@ export {
+   type SettingsKey,
+ } from './settings.ts'
+ 
++import { assertAcpRuntime, readInitialRuntimeConfig } from './runtime.ts'
++import type { AcpRuntime } from './runtime.ts'
++export { assertAcpRuntime, isAcpRuntime, readInitialRuntimeConfig, runRequiredOperation, validateRecognizedAcpLedgerEntry, type OperationKind, type AcpRuntime } from './runtime.ts'
++
+ export interface AcpConfig {
++  /** Internal programmatic lifecycle injection; deliberately not part of ACP settings. */
++  readonly runtime?: AcpRuntime
++
+   /**
+    * The context window used for pressure decisions, in tokens. When omitted,
+    * `autoModelContextLimit` (default true) resolves it automatically: the live
+@@ -276,6 +284,67 @@ export function resolveAcpConfig(config: Partial<AcpConfig> = {}): AcpConfig {
+   return { ...resolved, maxOverflowRetries }
+ }
+ 
++export function validateAcpConfig(config: Partial<AcpConfig>): AcpConfig {
++  const { runtime, ...values } = config
++  if (runtime !== undefined) assertAcpRuntime(runtime)
++  return resolveAcpConfig(values)
++}
++
++/** Validate advanced prompt/kernel overrides before a coordinator applies a config generation. */
++export function validateAdvancedConfig(config: Partial<AcpConfig>): AcpConfig {
++  // Cordis class mounts can pass volatile-ref objects in the schema fields.
++  // Normalize those first so an absent modelContextLimit stays absent and uses
++  // DEFAULT_CONTEXT_WINDOW instead of passing an opaque ref to the kernel.
++  config = { ...config, ...liveSettingsFromRefs(filterSettingsEntry(config)) }
++  const resolved = validateAcpConfig(config)
++  resolvePrompts(config.prompts)
++  if (config.modelContextLimit !== undefined
++    && (!Number.isInteger(config.modelContextLimit) || config.modelContextLimit <= 0)) {
++    throw new TypeError('modelContextLimit must be a positive integer')
++  }
++  const overrides = config.coreOverrides
++  if (overrides !== undefined) {
++    if (overrides === null || typeof overrides !== 'object' || Array.isArray(overrides)) {
++      throw new TypeError('coreOverrides must be an object')
++    }
++    const defaults = defaultConfig(config.modelContextLimit ?? DEFAULT_CONTEXT_WINDOW)
++    const knownRootKeys = new Set([
++      ...Object.keys(defaults),
++      'isToolProtected', 'isCompressTool', 'isMessageProtected', 'messagePathOf',
++      'neverPreserveRecentTools', 'preserveRecentTools', 'blockOps', 'rules', 'messageFilters',
++    ])
++    for (const [key, value] of Object.entries(overrides)) {
++      if (!knownRootKeys.has(key)) throw new TypeError(`coreOverrides.${key} is not a supported acp-kernel config key`)
++      const base = (defaults as unknown as Record<string, unknown>)[key]
++      if (base && typeof base === 'object' && !Array.isArray(base) && value && typeof value === 'object' && !Array.isArray(value)) {
++        const optionalNested: Record<string, string[]> = {
++          nudge: ['tierGrowthTokens', 'minPressureBenefitTokens', 'requireUsageSampleForPressure', 'maxEstimateHoldRounds'],
++          truncate: ['terminalEscapeAfter'],
++          absorb: ['mediaOnly'],
++          blockOps: ['enabled'],
++          rules: ['enabled', 'maxRules', 'maxRuleChars'],
++          crush: ['strategies'],
++          ccr: ['retrieveInlineTokens'],
++        }
++        const allowed = new Set([...Object.keys(base), ...(optionalNested[key] ?? [])])
++        for (const nestedKey of Object.keys(value)) {
++          if (!allowed.has(nestedKey)) throw new TypeError(`coreOverrides.${key}.${nestedKey} is not a supported acp-kernel config key`)
++        }
++      }
++    }
++  }
++  const kernelConfig = kernelConfigFor({
++    modelContextLimit: config.modelContextLimit ?? DEFAULT_CONTEXT_WINDOW,
++    nudgeMinContextLimitPct: config.nudgeMinContextLimitPct,
++    nudgeMaxContextLimitPct: config.nudgeMaxContextLimitPct,
++    nudgeEmergencyThresholdPct: config.nudgeEmergencyThresholdPct,
++    coreOverrides: config.coreOverrides,
++  })
++  const errors = validateKernelConfig(kernelConfig)
++  if (errors.length > 0) throw new TypeError(`invalid ACP coreOverrides: ${errors.join('; ')}`)
++  return resolved
++}
++
+ /**
+  * Apply `config.preset`, if one was given: an unknown name throws here at
+  * construction, and the preset fills ONLY the thresholds the caller left unset.
+@@ -367,6 +436,20 @@ interface OverflowRecoveryResult {
+   readonly shadowedTokenCount: number
+ }
+ 
++// Survives a managed engine remount for the same live Session object. On a
++// process restart, pre-step orphan repair reconstructs the same safety check
++// from the durable surface instead of relying on this in-memory marker.
++const pendingCompressPairHides = new WeakMap<Session, Map<string, number>>()
++
++function pendingPairHidesFor(session: Session): Map<string, number> {
++  let pending = pendingCompressPairHides.get(session)
++  if (pending === undefined) {
++    pending = new Map()
++    pendingCompressPairHides.set(session, pending)
++  }
++  return pending
++}
++
+ /**
+  * The ACP compaction backend. Subclasses the seam exactly like
+  * `dsh-compaction-basic`; swaps summarization-driven compaction for
+@@ -401,6 +484,8 @@ export class AcpCompactionEngine extends CompactionEngine {
+    */
+   readonly env: ToolEnvironment
+ 
++  /** Coordinator lifecycle bridge, when mounted by a managed runtime. */
++  private readonly runtime?: AcpRuntime
+   private readonly lastNudgeTurn = new LruMap<string, number>(DEFAULT_SESSION_CACHE_LIMIT)
+   /** Per-session emergency-nudge injection budget for the current user turn (issue #108). */
+   private readonly emergencyNudges = new Map<string, { turn: number; count: number }>()
+@@ -424,14 +509,26 @@ export class AcpCompactionEngine extends CompactionEngine {
+   private readonly overflowSessions = new Map<Session, Agent>()
+   constructor(ctx: Context, config: Partial<AcpConfig> = {}) {
+     super(ctx)
+-    // Class-mounted compositions arrive with the six knobs wrapped in volatile
+-    // refs (the loader resolves our static Config schema before construction);
+-    // unwrap them so preset resolution, the threshold-order assertion and the
+-    // config snapshot see plain values, not opaque objects.
+-    this.config = resolveAcpConfig({ ...config, ...liveSettingsFromRefs(filterSettingsEntry(config)) })
++    const runtimeValue: unknown = config.runtime
++    if (runtimeValue !== undefined) assertAcpRuntime(runtimeValue)
++    this.runtime = runtimeValue as AcpRuntime | undefined
++    const { runtime: _runtime, ...compositionConfig } = config
++    // Managed mounts intentionally ignore Cordis's static config object: every
++    // volatile field there is a ref cell (including absent values), not the
++    // coordinator's effective configuration. Runtime mode is sourced solely
++    // from the current coordinator snapshot.
++    const initialRuntimeConfig = this.runtime === undefined ? undefined : readInitialRuntimeConfig(this.runtime)
++    const effectiveConfig = initialRuntimeConfig ?? {
++      ...compositionConfig,
++      ...liveSettingsFromRefs(filterSettingsEntry(compositionConfig)),
++    }
++    this.config = validateAdvancedConfig({
++      ...effectiveConfig,
++      settingsEnabled: this.runtime ? false : compositionConfig.settingsEnabled,
++    })
+     // Resolve + validate prompt templates BEFORE building env: a template typo
+     // must fail engine construction, never silently leak into model context.
+-    this.prompts = resolvePrompts(config.prompts)
++    this.prompts = resolvePrompts(effectiveConfig.prompts)
+     const ports = this.config.countTokens !== undefined ? { countTokens: this.config.countTokens } : {}
+     this.kernel = createCore(ports)
+     // The kernel's docFeatures cache (per-doc search features) defaults to an
+@@ -479,7 +576,7 @@ export class AcpCompactionEngine extends CompactionEngine {
+     // compositions), row values arrive wrapped in volatile refs — unwrap them
+     // for one-shot reads, and keep the RAW filtered entry so the forms path can
+     // re-read through those refs live (form writes commit into them in place).
+-    const compositionEntry = presetFilledSettingsEntry(config)
++    const compositionEntry = presetFilledSettingsEntry(effectiveConfig)
+     // Construction-time snapshot — what "behaves exactly as composed" means.
+     // Detach falls back to THIS, never to the mutable `current`: on the
+     // legacy line the provider's own dispose hook resets the source to the
+@@ -489,7 +586,9 @@ export class AcpCompactionEngine extends CompactionEngine {
+     // than reverting to the composition.
+     const initialCurrent: AcpSettings = resolveAcpSettings(liveSettingsFromRefs(compositionEntry))
+     let current: AcpSettings = initialCurrent
+-    this.readSettingsSource = () => current
++    this.readSettingsSource = this.runtime
++      ? () => resolveAcpSettings(filterSettingsEntry(this.runtime!.readConfig()))
++      : () => current
+     const engine = this
+     const applySettings = (): void => {
+       const next = this.readSettingsSource()
+@@ -505,7 +604,7 @@ export class AcpCompactionEngine extends CompactionEngine {
+       }
+     }
+     this.resyncSettings = applySettings
+-    this.settingsCommand = makeSettingsCommandSurface(() => this.settingsService, () => current)
++    this.settingsCommand = this.runtime?.settingsCommand ?? makeSettingsCommandSurface(() => this.settingsService, () => current)
+     // Detach cleanup shared by both supported paths: cordis disposes the value
+     // an inject callback returns when the provider fiber unloads. Without it
+     // the engine keeps a dead provider handle (/acp-prune config would still
+@@ -519,7 +618,7 @@ export class AcpCompactionEngine extends CompactionEngine {
+       this.settingsService = undefined
+       this.readSettingsSource = () => initialCurrent
+     }
+-    if (this.config.settingsEnabled !== false) {
++    if (!this.runtime && this.config.settingsEnabled !== false) {
+       // Two supported host shapes, detected at runtime (issue #193): the
+       // ≤0.1.6 lines expose the legacy `installSection` section seam (the
+       // standalone `installSettingsSection` helper this was written against
+@@ -606,6 +705,7 @@ export class AcpCompactionEngine extends CompactionEngine {
+     }
+ 
+     const env: ToolEnvironment = {
++      runtime: this.runtime,
+       kernel: this.kernel,
+       store: this.store,
+       // The settings-exposed knobs read LIVE from the settings source, so a
+@@ -636,7 +736,8 @@ export class AcpCompactionEngine extends CompactionEngine {
+     // restart. Register eagerly, then re-attempt when the service appears
+     // (`internal/service`) or the app finishes booting (`ready`); guard so a
+     // late callback never double-registers.
+-    const tools = ctx.get('tools')
++    if (this.config.autoTools) {
++      const tools = ctx.get('tools')
+     if (tools !== undefined) {
+       for (const tool of makeTools(env)) tools.register(tool)
+     } else {
+@@ -652,7 +753,9 @@ export class AcpCompactionEngine extends CompactionEngine {
+         if (name === 'tools') registerTools()
+       })
+     }
+-    const commands = ctx.get('commands')
++    }
++    if (this.config.autoCommand) {
++      const commands = ctx.get('commands')
+     if (commands !== undefined) {
+       commands.register(acpCommand(env))
+     } else {
+@@ -668,6 +771,7 @@ export class AcpCompactionEngine extends CompactionEngine {
+         if (name === 'commands') registerCommand()
+       })
+     }
++    }
+     // After a successful compress tool result is appended, hide its
+     // call/result pair. The durable summary node was inserted mid-turn (before
+     // the result), so leaving the pair visible would put a user message between
+@@ -694,52 +798,89 @@ export class AcpCompactionEngine extends CompactionEngine {
+       // call/result pairing everywhere, never a per-listener copy.
+       const callId = toolCallIdOfResultEvent(event)
+       if (typeof callId !== 'string' || !this.compressCallIdsToHide.has(callId)) return
+-      this.compressCallIdsToHide.delete(callId)
+-      // session.append is NOT reentrant: calling it synchronously inside this
+-      // session/event dispatch (the outer append still holds the reentry lock)
+-      // throws "session append cannot reenter while another append is being
+-      // published" on live, store-attached sessions, and the dispatcher
+-      // silently swallows the error — the hide would be a no-op. Defer it to a
+-      // microtask: microtasks drain after the append fully publishes and
+-      // before the agent loop resumes, so the pair is hidden before the next
+-      // request is built.
+-      deferCompressPairHide(session, callId, event.seq, (error) => {
+-        ctx.logger.warn(`billion-context-dsh: hide compress call/result pair failed: ${String(error)}`)
++      const pending = pendingPairHidesFor(session)
++      pending.set(callId, event.seq)
++      // Acquire the write lease NOW, inside session/event, and keep it through
++      // the deferred microtask. The surface append lock makes synchronous hide
++      // invalid; acquiring only inside that microtask leaves a close-admission
++      // race where a compaction child could unmount with a malformed pair.
++      let operation: Promise<void | null> | void | null
++      try {
++        operation = this.runOperation('cleanup', () => new Promise<void>((resolve, reject) => {
++          deferCompressPairHide(
++            session,
++            callId,
++            event.seq,
++            reject,
++            () => {
++              hideCompressToolPair(session, callId, event.seq)
++              resolve()
++            },
++          )
++        }))
++      } catch (error) {
++        ctx.logger.warn(`billion-context-dsh: compress pair cleanup is pending until the next pre-step: ${String(error)}`)
++        return
++      }
++      if (operation === null) {
++        ctx.logger.warn('billion-context-dsh: compress pair cleanup is pending until the next pre-step: admission is closed')
++        return
++      }
++      void Promise.resolve(operation).then(() => {
++        pending.delete(callId)
++        this.compressCallIdsToHide.delete(callId)
++        if (pending.size === 0) pendingCompressPairHides.delete(session)
++      }).catch((error) => {
++        ctx.logger.warn(`billion-context-dsh: hide compress call/result pair failed; next pre-step will retry or refuse the request: ${String(error)}`)
+       })
+     })
+     ctx.on('agent/pre-step', async (payload, next) => {
+-      // A crash-interrupted tool leaves an orphan call/result on the surface:
+-      // it corrupts the pairing balance cache AND can 400 the next request
+-      // (strict providers reject tool messages without their call/response).
+-      // Clean them before EVERY step — not only when a nudge fires — so a
+-      // low-pressure session never hits the orphan 400 (issue #18). No call is
+-      // in flight at pre-step (the previous step's tools all landed), so the
+-      // default empty in-flight set is safe.
+-      stripOrphanedSurfaceToolMessages(payload.agent.session)
+-      // Hot-apply settings BEFORE any knob is read this step (issue #193): on
+-      // the forms line, writes committed between steps land in our volatile
+-      // refs with no event we receive — this re-read is what applies them.
++      const session = payload.agent.session
++      // Rehydrate/validate before even checking autoNudge. A native ledger with
++      // unverifiable provenance must fail before the host can send this turn.
++      const prepared = await this.runOperation('compress', () => {
++        this.store.stateFor(session)
++        const pending = pendingCompressPairHides.get(session)
++        if (pending !== undefined) {
++          for (const [callId, resultSeq] of pending) {
++            const cleaned = this.runOperation('cleanup', () => hideCompressToolPair(session, callId, resultSeq))
++            if (cleaned === null) throw new Error(`ACP recovery blocked: deferred compress pair ${callId} is still pending`)
++            pending.delete(callId)
++            this.compressCallIdsToHide.delete(callId)
++          }
++          if (pending.size === 0) pendingCompressPairHides.delete(session)
++        }
++        // Orphan cleanup mutates the durable surface; it is part of the same
++        // write lease and must finish before a provider request can proceed.
++        stripOrphanedSurfaceToolMessages(session)
++        return true
++      })
++      if (prepared === null) throw new Error('ACP recovery blocked: session validation/cleanup admission closed before provider request')
++      // Refresh diagnostics before this step; runtime snapshots themselves are
++      // read live and never cached by the engine.
+       engine.resyncSettings()
+-      if (!engine.readSettingsSource().autoNudge) return next()
+       const decision = await next()
+-      if (decision.kind === 'reject') return decision
+-      const window = await this.windowFor(payload.agent, payload.modelSelection)
+-      const outcome = buildNudge(
+-        payload.agent,
+-        { ...env, modelContextLimit: window.limit },
+-        this.lastNudgeTurn,
+-        this.emergencyNudges,
+-        () => {
+-          // The kernel still wants an emergency nudge but the per-turn budget
+-          // is spent: log WHY the model stops receiving nudges instead of
+-          // letting the silence look like a bug (issue #108 review).
+-          ctx.logger.warn(
+-            `billion-context-dsh: emergency nudge suppressed — per-turn budget of ${EMERGENCY_NUDGE_MAX_PER_TURN} spent (session ${payload.agent.session.id}); pressure is still above the emergency threshold`,
+-          )
+-        },
+-      )
++      if (decision.kind === 'reject' || !engine.readSettingsSource().autoNudge) return decision
++      const outcome = await this.runOperation('nudge', async () => {
++        const window = await this.windowFor(payload.agent, payload.modelSelection)
++        return buildNudge(
++          payload.agent,
++          { ...env, modelContextLimit: window.limit },
++          this.lastNudgeTurn,
++          this.emergencyNudges,
++          () => {
++            // The kernel still wants an emergency nudge but the per-turn budget
++            // is spent: log WHY the model stops receiving nudges.
++            ctx.logger.warn(
++              `billion-context-dsh: emergency nudge suppressed — per-turn budget of ${EMERGENCY_NUDGE_MAX_PER_TURN} spent (session ${payload.agent.session.id}); pressure is still above the emergency threshold`,
++            )
++          },
++        )
++      })
++      // null is the coordinator's closed-admission signal, or the kernel's
++      // ordinary no-nudge result: in either case preserve the host decision.
+       if (outcome === null) return decision
+-      return { kind: 'enter', messages: [...decision.messages, outcome.message] }
++      return { ...decision, kind: 'enter', messages: [...decision.messages, outcome.message] }
+     })
+     // ── Context-overflow recovery (M5) ─────────────────────────────────
+     // The seam rethrows a failed request unless a listener answers
+@@ -760,12 +901,13 @@ export class AcpCompactionEngine extends CompactionEngine {
+     })
+     ctx.on('agent/request-error', async ({ agent, failure, signal }, next) => {
+       if (failure.code !== CONTEXT_WINDOW_EXCEEDED_CODE || signal.aborted) return next()
++      const admittedResult = await this.runOperation('overflow', async () => {
+       this.overflowSessions.set(agent.session, agent)
+       const retries = this.overflowRetries.get(agent) ?? 0
+       // `resolveAcpConfig` normalizes the value, so this fallback only guards a
+       // future config shape; it MUST stay 1 (the host's own default) — reading 0
+       // here would disable overflow recovery for a key that was never set to 0.
+-      const max = this.config.maxOverflowRetries ?? 1
++      const max = this.runtime?.readConfig().maxOverflowRetries ?? this.config.maxOverflowRetries ?? 1
+       if (retries >= max) {
+         this.ctx.logger.warn(
+           `billion-context-dsh: context-overflow recovery budget spent (${max} retries) for session ${agent.session.id}; preserving the original request error`,
+@@ -786,7 +928,7 @@ export class AcpCompactionEngine extends CompactionEngine {
+             `billion-context-dsh: context-overflow compaction failed after durable surface progress: ${message}; retrying from the replacement surface`,
+           )
+           this.overflowRetries.set(agent, retries + 1)
+-          return { kind: 'retry' }
++          return { kind: 'retry' as const }
+         }
+         this.ctx.logger.warn(
+           `billion-context-dsh: context-overflow compaction failed: ${message}; ${signal.aborted ? 'cancellation prevents retry' : 'preserving the original request error'}`,
+@@ -800,7 +942,9 @@ export class AcpCompactionEngine extends CompactionEngine {
+         )
+       }
+       this.overflowRetries.set(agent, retries + 1)
+-      return { kind: 'retry' }
++      return { kind: 'retry' as const }
++      })
++      return admittedResult === null ? next() : admittedResult
+     })
+     // The load-bearing ACP guidance lives in the system prompt ONCE; nudges
+     // stay short and advisory (model-driven: the model decides). The
+@@ -809,30 +953,46 @@ export class AcpCompactionEngine extends CompactionEngine {
+     // retry pattern as tools and commands: eager registration, then
+     // re-attempt when the service appears via `internal/service`; guard so a
+     // late callback never double-registers.
+-    const systemPrompt = ctx.get('systemPrompt')
+-    if (systemPrompt !== undefined) {
+-      systemPrompt.section({
+-        name: 'billion-context-dsh',
+-        order: ACP_SYSTEM_PROMPT_ORDER,
+-        text: renderSystemPrompt(this.prompts),
+-      })
+-    } else {
+-      let done = false
+-      const registerSystemPrompt = (): void => {
+-        if (done) return
+-        const registry = ctx.get('systemPrompt')
+-        if (registry === undefined) return
+-        done = true
++    let promptRegistered = false
++    let promptPending = false
++    const registerSystemPrompt = (): void => {
++      if (promptRegistered || promptPending) return
++      const registry = ctx.get('systemPrompt')
++      if (registry === undefined) return
++      const install = (): true => {
+         registry.section({
+           name: 'billion-context-dsh',
+           order: ACP_SYSTEM_PROMPT_ORDER,
+           text: renderSystemPrompt(this.prompts),
+         })
++        return true
+       }
+-      ctx.on('internal/service', (name: unknown) => {
+-        if (name === 'systemPrompt') registerSystemPrompt()
++      if (this.runtime === undefined) {
++        install()
++        promptRegistered = true
++        return
++      }
++      promptPending = true
++      void Promise.resolve(this.runOperation('prompt', install)).then((installed) => {
++        promptPending = false
++        if (installed === null) {
++          ctx.logger.warn('billion-context-dsh: system prompt registration skipped because this ACP generation is no longer accepting work')
++          return
++        }
++        promptRegistered = true
++      }).catch((error) => {
++        promptPending = false
++        ctx.logger.warn(`billion-context-dsh: system prompt registration failed: ${String(error)}`)
+       })
+     }
++    registerSystemPrompt()
++    ctx.on('internal/service', (name: unknown) => {
++      if (name === 'systemPrompt') registerSystemPrompt()
++    })
++  }
++
++  private runOperation<T>(kind: 'nudge' | 'overflow' | 'compress' | 'read' | 'settings' | 'prompt' | 'cleanup', fn: () => T | Promise<T>): Promise<T | null> | T | null {
++    return this.runtime === undefined ? fn() : this.runtime.runOperation(kind, fn)
+   }
+ 
+   /**
+diff --git a/src/settings.ts b/src/settings.ts
+index 35b406a..6483e93 100644
+--- a/src/settings.ts
++++ b/src/settings.ts
+@@ -203,6 +203,8 @@ function markVolatile<T>(schema: T): T {
+  * exists from the 0.2.0 line's schemastery onward (see the helper).
+  */
+ export const AcpPluginConfigSchema = z.object({
++  // Programmatic-only coordinator wiring (not volatile, so it is never exposed by SettingsForms).
++  runtime: z.any(),
+   modelContextLimit: markVolatile(z.number().step(1).min(1)),
+   autoModelContextLimit: markVolatile(z.boolean()),
+   nudgeMinContextLimitPct: markVolatile(z.number().min(0).max(1)),
+diff --git a/src/tools.ts b/src/tools.ts
+index aa915b4..0645ca0 100644
+--- a/src/tools.ts
++++ b/src/tools.ts
+@@ -48,7 +48,11 @@ import { DEFAULT_RESOLVED, type ResolvedPrompts } from './prompts.ts'
+ import type { SettingsCommandSurface } from './settings.ts'
+ import type { PresetName } from './presets.ts'
+ 
++import type { AcpRuntime } from './runtime.ts'
++import { runRequiredOperation } from './runtime.ts'
++
+ export interface ToolEnvironment extends KernelConfigInput {
++  readonly runtime?: AcpRuntime
+   readonly kernel: CompressionCore
+   readonly store: AcpStateStore
+   /** Display-only: the named preset that produced the nudge thresholds above, if any (`/acp-prune status` names it). Never read by the kernel path. */
+@@ -1202,7 +1206,7 @@ export function makeTools(env: ToolEnvironment): ToolDefinition[] {
+       parameters: compressParameters,
+       output: textOutput(),
+       async execute(args, exec) {
+-        return handleCompress(env, args as CompressArgs, exec)
++        return runRequiredOperation(env.runtime, 'compress', () => handleCompress(env, args as CompressArgs, exec))
+       },
+     }),
+     defineTool({
+@@ -1211,7 +1215,7 @@ export function makeTools(env: ToolEnvironment): ToolDefinition[] {
+       parameters: decompressParameters,
+       output: textOutput(),
+       execute(args, exec) {
+-        return Promise.resolve(handleDecompress(env, args as DecompressArgs, exec))
++        return runRequiredOperation(env.runtime, 'read', () => handleDecompress(env, args as DecompressArgs, exec))
+       },
+     }),
+     defineTool({
+@@ -1220,7 +1224,7 @@ export function makeTools(env: ToolEnvironment): ToolDefinition[] {
+       parameters: searchParameters,
+       output: textOutput(),
+       execute(args, exec) {
+-        return Promise.resolve(handleSearch(env, args as SearchArgs, exec))
++        return runRequiredOperation(env.runtime, 'read', () => handleSearch(env, args as SearchArgs, exec))
+       },
+     }),
+     defineTool({
+@@ -1229,7 +1233,7 @@ export function makeTools(env: ToolEnvironment): ToolDefinition[] {
+       parameters: statusParameters,
+       output: textOutput(),
+       execute(args, exec) {
+-        return handleStatus(env, args as StatusArgs, exec)
++        return runRequiredOperation(env.runtime, 'read', () => handleStatus(env, args as StatusArgs, exec))
+       },
+     }),
+   ]
+diff --git a/src/commands.ts b/src/commands.ts
+index a92d03f..71e282a 100644
+--- a/src/commands.ts
++++ b/src/commands.ts
+@@ -229,14 +229,18 @@ function decompressText(_env: ToolEnvironment, agent: Agent, args: string[]): string {
+ }
+ 
+ /** Register the /acp-prune command (idempotent per engine). */
++import { runRequiredOperation } from './runtime.ts'
++
+ export function acpCommand(env: ToolEnvironment): CommandDefinition {
+   return {
+     name: 'acp-prune',
+-    description:
+-      'Active Context Pruning — model-driven context compression. '
+-      + 'Usage: /acp-prune status | /acp-prune compress <startSeq> <endSeq> <summary> | /acp-prune decompress <blockId> [offset] [limit] | /acp-prune config [list|set <key> <value>|reset <key>|all]',
++    description: 'Active Context Pruning',
++    input: { hint: 'status | compress | decompress | config' },
+     handler: async (invocation) => {
+       const raw = invocation.rawInput.trim()
++      const settingsWrite = /^config\s+(set|reset)\b/.test(raw)
++      const kind = raw.startsWith('compress') ? 'compress' : settingsWrite ? 'settings' : 'read'
++      return runRequiredOperation(env.runtime, kind, async () => {
+       if (raw === '' || raw === 'status') {
+         return { kind: 'success', text: await statusText(env, invocation.agent) }
+       }
+@@ -250,6 +255,7 @@ export function acpCommand(env: ToolEnvironment): CommandDefinition {
+         return { kind: 'success', text: decompressText(env, invocation.agent, raw.slice('decompress'.length).trim().split(/\s+/)) }
+       }
+       return { kind: 'error', text: `unknown /acp-prune subcommand "${raw.split(/\s+/)[0]}" — use status | compress | decompress | config` }
++      })
+     },
+   }
+ }
+@@ -297,7 +303,7 @@ function configListText(surface: SettingsCommandSurface | undefined): string {
+     const source = key in userSection ? 'user' : key in baseSection ? 'base' : 'default'
+     lines.push(`  ${key.padEnd(27)} ${formatSettingsValue(key, snapshot[key]).padEnd(12)} ${source}`)
+   }
+-  lines.push('', '  changes apply to running sessions immediately (no restart)')
++  lines.push('', '  changes are saved to shared settings; a managed engine may still be switching')
+   lines.push('  coreOverrides (composition layer) merge LAST and beat these values on same-name keys')
+   lines.push('  /acp-prune config reset <key> returns the key to the composition row / engine default')
+   return lines.join('\n')
+@@ -333,9 +339,9 @@ async function configSetText(surface: SettingsCommandSurface | undefined, key: s
+     return settingsWriteFailure(error)
+   }
+   const windowNote = key === 'modelContextLimit' || key === 'autoModelContextLimit'
+-    ? '\n  window cache cleared — the next step re-resolves the context window'
++    ? '\n  the next engine generation will re-resolve the context window'
+     : ''
+-  return `✓ ${key} = ${String(parsed.value)} — applied to running sessions${windowNote}`
++  return `✓ ${key} = ${String(parsed.value)} — saved to shared settings; it may still be applying${windowNote}`
+ }
+ 
+ async function configResetText(surface: SettingsCommandSurface | undefined, target: string): Promise<string> {
+diff --git a/src/region.ts b/src/region.ts
+index 51a7030..a5eb2c2 100644
+--- a/src/region.ts
++++ b/src/region.ts
+@@ -12,6 +12,7 @@
+  */
+ 
+ import { randomUUID } from 'node:crypto'
++import { surfaceSeqBounds } from './runtime.ts'
+ import type { Session, SessionEvent, SessionEventMap } from '@deepseek-ai/dsh-session'
+ // toolPairingBalanced* come from the host package: the published seam reads
+ // only eventAt / surface.replaceGeneration, present on every supported
+@@ -1044,10 +1045,14 @@ export function deferCompressPairHide(
+   callId: string,
+   resultSeq: number,
+   onError?: (error: unknown) => void,
++  operation?: () => void | Promise<void>,
+ ): void {
+   queueMicrotask(() => {
+     try {
+-      hideCompressToolPair(session, callId, resultSeq)
++      const result = operation === undefined ? hideCompressToolPair(session, callId, resultSeq) : operation()
++      if (result !== undefined && typeof (result as Promise<void>).then === 'function') {
++        void (result as Promise<void>).catch((error) => onError?.(error))
++      }
+     } catch (error) {
+       onError?.(error)
+     }
+@@ -1429,16 +1434,10 @@ export function buildCompressibleSeqRanges(
+ export function surfaceSummary(session: Session): string {
+   const nodes = session.surface.nodes
+   if (nodes.length === 0) return 'empty'
+-  // Surface nodes are NOT guaranteed to be ordered: a compaction replace lands
+-  // the checkpoint node first, so [15, 6, 7, …]. Report the span as min..max
+-  // rather than first..last, which would read "seqs 15..12" after a compress.
+-  let first = nodes[0]!
+-  let last = nodes[0]!
+-  for (const seq of nodes) {
+-    if (seq < first) first = seq
+-    if (seq > last) last = seq
+-  }
+-  return `${nodes.length} nodes, seqs ${first}..${last}`
++  // Surface node order is not numeric after a replacement (e.g. [8, 2, 3]);
++  // bounds are values, while range ordering/resolution remains surface-position aware.
++  const bounds = surfaceSeqBounds(nodes)!
++  return `${nodes.length} nodes, seqs ${bounds.start}..${bounds.end}`
+ }
+ 
+ /** One block as seen by the tier machinery: durable id ↔ kernel ref (`bN`). */
+diff --git a/src/state.ts b/src/state.ts
+index 1b8f405..e26fffc 100644
+--- a/src/state.ts
++++ b/src/state.ts
+@@ -19,6 +19,7 @@
+ 
+ import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
+ import { createInitialState, type CompressionBlock, type CompressionState } from 'acp-kernel'
++import { validateRecognizedAcpLedgerEntry } from './runtime.ts'
+ import { DEFAULT_SESSION_CACHE_LIMIT, LruMap } from './lru.ts'
+ import { rebuildBlockLedger } from './region.ts'
+ import { sessionEventsOf } from './session-events.ts'
+@@ -108,6 +109,12 @@ function nextRunIdAfter(blocks: readonly CompressionBlock[]): number {
+   return max + 1
+ }
+ 
++interface ReplayValidationCursor {
++  length: number
++  compactionIds: Set<string>
++  kernelBlockIds: Set<string>
++}
++
+ export class AcpStateStore {
+   /**
+    * Live kernel states, capped by an LRU policy (issue #113): once the cap is
+@@ -120,13 +127,31 @@ export class AcpStateStore {
+    * counters) all self-heal on the session's next turn.
+    */
+   private readonly states: LruMap<string, CompressionState>
++  private readonly replayValidation: LruMap<string, ReplayValidationCursor>
+ 
+   constructor(limit: number = DEFAULT_SESSION_CACHE_LIMIT) {
+     this.states = new LruMap(limit)
++    this.replayValidation = new LruMap(limit)
++  }
++
++  /** Validate newly appended durable events before any provider request; old log prefixes are immutable. */
++  validateSession(session: Session): void {
++    const id = session.id
++    const events = sessionEventsOf(session)
++    const previous = this.replayValidation.get(id)
++    const cursor: ReplayValidationCursor = previous !== undefined && events.length >= previous.length
++      ? { length: previous.length, compactionIds: new Set(previous.compactionIds), kernelBlockIds: new Set(previous.kernelBlockIds) }
++      : { length: 0, compactionIds: new Set(), kernelBlockIds: new Set() }
++    for (let index = cursor.length; index < events.length; index += 1) {
++      validateRecognizedAcpLedgerEntry(events[index], index, events, cursor.compactionIds, cursor.kernelBlockIds)
++    }
++    cursor.length = events.length
++    this.replayValidation.set(id, cursor)
+   }
+ 
+   /** Kernel state for one session, initialised on first access. */
+   stateFor(session: Session): CompressionState {
++    this.validateSession(session)
+     const id = session.id
+     const existing = this.states.get(id)
+     if (existing !== undefined) return existing
+@@ -147,5 +172,6 @@ export class AcpStateStore {
+ 
+   delete(session: Session): void {
+     this.states.delete(session.id)
++    this.replayValidation.delete(session.id)
+   }
+ }
+diff --git a/src/runtime.ts b/src/runtime.ts
+new file mode 100644
+index 0000000..4284211
+--- /dev/null
++++ b/src/runtime.ts
+@@ -0,0 +1,119 @@
++import type { AcpConfig } from './index.ts';
++import type { SettingsCommandSurface } from './settings.ts';
++
++export function validateRecognizedAcpLedgerEntry(
++  event: unknown,
++  index: number,
++  events: readonly unknown[],
++  knownCompactionIds: Set<string>,
++  knownKernelBlockIds: Set<string>,
++): void {
++  const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
++  const item = isRecord(event) ? event : {};
++  if (item.type !== 'compaction/summary') return;
++  const data = isRecord(item.data) ? item.data : {};
++  const compactionId = typeof data.compactionId === 'string' && data.compactionId.length > 0
++    ? data.compactionId : `event-${index}`;
++  let ledger: Record<string, unknown> | undefined;
++  if (Array.isArray(data.rawOutput)) {
++    for (const block of data.rawOutput) {
++      if (!isRecord(block) || block.type !== 'text' || typeof block.text !== 'string') continue;
++      let parsed: unknown;
++      try { parsed = JSON.parse(block.text); } catch { continue; }
++      if (isRecord(parsed) && parsed.$dshAcpBlockLedger === 1) { ledger = parsed; break; }
++    }
++  }
++  if (ledger === undefined) {
++    if (typeof data.compactionId === 'string' && data.compactionId.length > 0) knownCompactionIds.add(data.compactionId)
++    return; // Generic/stock or unsupported-version records keep their existing behavior.
++  }
++  const fail = (reason: string): never => {
++    throw new Error(`ACP ledger v1 recovery rejected compaction ${compactionId}: ${reason}; repair or restore the session ledger before sending a provider request`);
++  };
++  if (typeof data.compactionId !== 'string' || data.compactionId.length === 0) return fail('compactionId is missing');
++  if (knownCompactionIds.has(data.compactionId)) return fail(`duplicate compactionId ${data.compactionId}`);
++  const seqs = data.shadowedSeqs;
++  if (!Array.isArray(seqs) || seqs.length === 0 || !seqs.every((seq) => Number.isInteger(seq) && seq >= 0 && seq < index && events[seq] !== undefined)) {
++    fail('shadowedSeqs is missing an original event or contains an invalid seq');
++  }
++  const range = isRecord(data.shadowedRange) ? data.shadowedRange : undefined;
++  if (range === undefined || !Number.isInteger(range.start) || !Number.isInteger(range.end) || (range.start as number) > (range.end as number)) {
++    fail('shadowedRange provenance is missing or invalid');
++  }
++  if (typeof ledger.kernelBlockId !== 'string' || !/^b\d+$/.test(ledger.kernelBlockId)) return fail('kernelBlockId provenance is missing or invalid');
++  const kernelBlockId = ledger.kernelBlockId as string;
++  if (knownKernelBlockIds.has(kernelBlockId)) return fail(`duplicate kernelBlockId ${kernelBlockId}`);
++  const tierValue = ledger.tier ?? (data.tier === 2 || data.tier === 3 ? data.tier : 1);
++  if (tierValue !== 1 && tierValue !== 2 && tierValue !== 3) return fail('tier is invalid');
++  const tier = tierValue as 1 | 2 | 3;
++  const stringArray = (value: unknown, allowEmpty = false): value is string[] => Array.isArray(value) && (allowEmpty || value.length > 0) && value.every((id) => typeof id === 'string' && id.length > 0);
++  const directIdsValid = tier === 1
++    ? stringArray(ledger.directMessageIds)
++    : ledger.directMessageIds === undefined || stringArray(ledger.directMessageIds, true);
++  if (!directIdsValid || !stringArray(ledger.effectiveMessageIds)) return fail('direct/effective message provenance is missing or invalid');
++  if (tier > 1) {
++    if (!stringArray(ledger.parentBlockIds)) return fail(`tier ${tier} parentBlockIds are missing or invalid`);
++    const parents = ledger.parentBlockIds as string[];
++    for (const parent of parents) {
++      if (!knownCompactionIds.has(parent)) return fail(`tier ${tier} parent ${parent} is not present earlier in the ledger`);
++    }
++  } else if (ledger.parentBlockIds !== undefined && (!Array.isArray(ledger.parentBlockIds) || !ledger.parentBlockIds.every((id) => typeof id === 'string'))) {
++    return fail('parentBlockIds are invalid');
++  }
++  knownCompactionIds.add(data.compactionId as string)
++  knownKernelBlockIds.add(kernelBlockId);
++}
++
++export function readInitialRuntimeConfig(runtime: AcpRuntime): Partial<AcpConfig> {
++  const snapshot = runtime.readConfig();
++  if (snapshot === null || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
++    throw new TypeError('AcpCompactionEngine runtime.readConfig() must return a configuration object');
++  }
++  const { runtime: _nestedRuntime, ...effective } = snapshot;
++  return effective;
++}
++
++export function surfaceSeqBounds(nodes: readonly number[]): { start: number; end: number } | null {
++  if (nodes.length === 0) return null;
++  let start = nodes[0]!;
++  let end = nodes[0]!;
++  for (let index = 1; index < nodes.length; index += 1) {
++    const seq = nodes[index]!;
++    if (seq < start) start = seq;
++    if (seq > end) end = seq;
++  }
++  return { start, end };
++}
++
++export const OPERATION_KINDS = ['nudge', 'overflow', 'compress', 'read', 'settings', 'prompt', 'cleanup'] as const;
++export type OperationKind = (typeof OPERATION_KINDS)[number];
++
++export interface AcpRuntime {
++  /** Return the coordinator's latest effective configuration snapshot. */
++  readConfig: () => Partial<AcpConfig>;
++  /** Acquire an operation lease, invoke fn, and release the lease in finally. */
++  runOperation: <T>(kind: OperationKind, fn: () => T | Promise<T>) => Promise<T | null> | T | null;
++  /** Optional adapter for the shared settings API; legacy config commands delegate here. */
++  settingsCommand?: SettingsCommandSurface;
++}
++
++export function isAcpRuntime(value: unknown): value is AcpRuntime {
++  if (value === null || typeof value !== 'object') return false;
++  const runtime = value as Partial<AcpRuntime>;
++  return typeof runtime.readConfig === 'function'
++    && typeof runtime.runOperation === 'function'
++    && (runtime.settingsCommand === undefined || typeof runtime.settingsCommand === 'object');
++}
++
++export function assertAcpRuntime(value: unknown): asserts value is AcpRuntime {
++  if (!isAcpRuntime(value)) {
++    throw new TypeError('AcpCompactionEngine runtime must provide readConfig() and runOperation(kind, fn)');
++  }
++}
++
++/** Manual/read actions must never silently fall back when their generation is unavailable. */
++export async function runRequiredOperation<T>(runtime: AcpRuntime | undefined, kind: OperationKind, fn: () => T | Promise<T>): Promise<T> {
++  const result = runtime === undefined ? await fn() : await runtime.runOperation(kind, fn);
++  if (result === null) throw new Error(`ACP ${kind} operation is unavailable (generation is not accepting work)`);
++  return result;
++}
