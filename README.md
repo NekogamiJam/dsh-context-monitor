@@ -16,9 +16,9 @@
 
 在 DSH 插件管理器中任选一种安装来源（均含前端产物，无需构建脚本）：
 
-- **npm（推荐）：** `dsh-context-monitor`，或指定版本 `dsh-context-monitor@0.1.7`。
-- **GitHub 源码：** `github:NekogamiJam/dsh-context-monitor#v0.1.7`。
-- **GitHub 预打包文件：** [v0.1.7 安装包](https://github.com/NekogamiJam/dsh-context-monitor/releases/download/v0.1.7/dsh-context-monitor-0.1.7.tgz)。
+- **npm（推荐）：** `dsh-context-monitor`，也可用 `dsh-context-monitor@X.Y.Z` 固定版本。
+- **GitHub 源码：** 从 [Releases](https://github.com/NekogamiJam/dsh-context-monitor/releases) 选定标签后使用 `github:NekogamiJam/dsh-context-monitor#vX.Y.Z`。
+- **GitHub 预打包文件：** [下载最新稳定版安装包](https://github.com/NekogamiJam/dsh-context-monitor/releases/latest/download/dsh-context-monitor.tgz)。
 
 旧版包名为 `@local/dsh-context-monitor`；不会自动迁移到新包名。新旧包使用同一个插件行 ID，请勿并装。需要切换时，在插件管理器中移除旧 bundle，再安装新包；若宿主提示重启，按提示操作。移除旧 bundle 不会改写会话历史。
 

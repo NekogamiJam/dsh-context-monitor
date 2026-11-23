@@ -1,0 +1,186 @@
+name: Validate and publish
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.package.outputs.version }}
+      sha256: ${{ steps.package.outputs.sha256 }}
+      integrity: ${{ steps.package.outputs.integrity }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.19.0'
+          package-manager-cache: false
+      - name: Validate stable release tag
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        run: |
+          git merge-base --is-ancestor HEAD refs/remotes/origin/main
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const pkg = JSON.parse(readFileSync('package.json'));
+          assert.match(pkg.version, /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/);
+          assert.equal(process.env.GITHUB_REF_NAME, `v${pkg.version}`);
+          JS
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm test
+      - run: npm run check
+      - name: Pack and inspect the exact release archive
+        id: package
+        run: |
+          dir="$RUNNER_TEMP/monitor-package"
+          mkdir -p "$dir"
+          npm pack --ignore-scripts --json --pack-destination "$dir" > "$dir/pack.json"
+          node --input-type=module - "$dir" <<'JS'
+          import assert from 'node:assert/strict';
+          import { createHash } from 'node:crypto';
+          import { appendFileSync, readFileSync, renameSync } from 'node:fs';
+          import { join } from 'node:path';
+          const dir = process.argv[2];
+          const pkg = JSON.parse(readFileSync('package.json'));
+          const [packed] = JSON.parse(readFileSync(join(dir, 'pack.json')));
+          assert.equal(packed.name, 'dsh-context-monitor');
+          assert.equal(pkg.repository.url, 'https://github.com/NekogamiJam/dsh-context-monitor.git');
+          assert.equal(packed.version, pkg.version);
+          assert.deepEqual(packed.files.map(f => f.path).sort(), [
+            'LICENSE', 'README.md', 'client.js', 'cordis.patch.yml',
+            'docs/COMPATIBILITY.md', 'docs/VERIFICATION.md', 'docs/context-monitor-preview.svg',
+            'icon.svg', 'index.js', 'locale/en.json', 'locale/zh.json', 'model.js', 'package.json',
+          ].sort());
+          const original = join(dir, packed.filename);
+          const bytes = readFileSync(original);
+          const integrity = `sha512-${createHash('sha512').update(bytes).digest('base64')}`;
+          assert.equal(integrity, packed.integrity);
+          const sha256 = createHash('sha256').update(bytes).digest('hex');
+          renameSync(original, join(dir, 'dsh-context-monitor.tgz'));
+          appendFileSync(process.env.GITHUB_OUTPUT, `version=${pkg.version}\nsha256=${sha256}\nintegrity=${integrity}\n`);
+          JS
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: npm-package
+          path: ${{ runner.temp }}/monitor-package/dsh-context-monitor.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  npm:
+    if: github.repository == 'NekogamiJam/dsh-context-monitor' && github.event_name == 'push' && github.ref_type == 'tag'
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+    env:
+      VERSION: ${{ needs.package.outputs.version }}
+      PACKAGE_SHA256: ${{ needs.package.outputs.sha256 }}
+      PACKAGE_INTEGRITY: ${{ needs.package.outputs.integrity }}
+    steps:
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.19.0'
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: npm-package
+      - name: Publish with npm Trusted Publishing
+        run: |
+          printf '%s  dsh-context-monitor.tgz\n' "$PACKAGE_SHA256" | sha256sum --check --strict
+          node --input-type=module <<'JS' > "$RUNNER_TEMP/npm-publish-decision"
+          import assert from 'node:assert/strict';
+          const { VERSION: version, PACKAGE_INTEGRITY: integrity } = process.env;
+          const res = await fetch('https://registry.npmjs.org/dsh-context-monitor', {
+            headers: { 'cache-control': 'no-cache' }, signal: AbortSignal.timeout(20_000),
+          });
+          assert.ok(res.ok, `Could not inspect existing npm package: HTTP ${res.status}`);
+          const meta = await res.json();
+          const existing = meta.versions?.[version];
+          if (existing) {
+            assert.equal(existing.dist?.integrity, integrity, `npm ${version} exists with a different archive`);
+            console.log('skip');
+          } else {
+            const latest = meta['dist-tags']?.latest;
+            assert.match(latest, /^\d+\.\d+\.\d+$/, 'npm latest must be a stable version');
+            const parts = v => v.split('.').map(x => BigInt(x));
+            const a = parts(version), b = parts(latest);
+            const first = a.findIndex((x, i) => x !== b[i]);
+            assert.ok(first >= 0 && a[first] > b[first], `Refusing to move npm latest backwards from ${latest}`);
+            console.log('publish');
+          }
+          JS
+          if [[ $(<"$RUNNER_TEMP/npm-publish-decision") == publish ]]; then
+            npm publish ./dsh-context-monitor.tgz --ignore-scripts --access public --tag latest --registry https://registry.npmjs.org
+          else
+            echo 'The exact archive is already published; continuing to GitHub Release.'
+          fi
+
+  github-release:
+    needs: [package, npm]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      PACKAGE_SHA256: ${{ needs.package.outputs.sha256 }}
+      PACKAGE_INTEGRITY: ${{ needs.package.outputs.integrity }}
+      VERSION: ${{ needs.package.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: npm-package
+      - name: Publish the same archive on GitHub Releases
+        run: |
+          printf '%s  dsh-context-monitor.tgz\n' "$PACKAGE_SHA256" | sha256sum --check --strict
+          npm_meta=$(curl --fail --silent --show-error --retry 3 --retry-all-errors --max-time 10 -H 'Cache-Control: no-cache' "https://registry.npmjs.org/dsh-context-monitor/$VERSION")
+          jq -e --arg integrity "$PACKAGE_INTEGRITY" '.dist.integrity == $integrity' <<< "$npm_meta" > /dev/null
+          tag="v$VERSION"
+          existing=$(gh api --paginate "repos/$GH_REPO/releases?per_page=100" | jq -cs --arg tag "$tag" '[.[][] | select(.tag_name == $tag)] | if length > 1 then error("multiple releases for tag") else .[0] end')
+          if [[ $existing == null ]]; then
+            gh release create "$tag" --draft --verify-tag --title "$tag" --generate-notes
+            existing=$(gh release view "$tag" --json databaseId,isDraft,isPrerelease | jq -c '{id:.databaseId,draft:.isDraft,prerelease:.isPrerelease}')
+          fi
+          jq -e '.prerelease == false' <<< "$existing" > /dev/null
+          id=$(jq -er '.id' <<< "$existing")
+          assets=$(gh api "repos/$GH_REPO/releases/$id/assets")
+          asset=$(jq -c '[.[] | select(.name == "dsh-context-monitor.tgz")] | if length > 1 then error("multiple package assets") else .[0] end' <<< "$assets")
+          if [[ $asset == null ]]; then
+            jq -e '.draft == true' <<< "$existing" > /dev/null
+            gh release upload "$tag" dsh-context-monitor.tgz
+            asset=$(gh api "repos/$GH_REPO/releases/$id/assets" --jq '.[] | select(.name == "dsh-context-monitor.tgz")')
+          fi
+          jq -e --arg digest "sha256:$PACKAGE_SHA256" '.state == "uploaded" and .digest == $digest' <<< "$asset" > /dev/null
+          if jq -e '.draft == true' <<< "$existing" > /dev/null; then
+            latest=$(curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' https://registry.npmjs.org/dsh-context-monitor/latest | jq -er '.version')
+            if [[ $latest == "$VERSION" ]]; then
+              gh release edit "$tag" --draft=false --latest
+            else
+              gh release edit "$tag" --draft=false --latest=false
+            fi
+          fi
+          gh release view "$tag" --json url,isDraft --jq 'if .isDraft then error("release is still a draft") else .url end'
