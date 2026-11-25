@@ -1,5 +1,5 @@
 # Only the scoped stock compaction backend/command pair is replaced.
-# Web presets derived from DeepSeek Harness dsh-v0.2.2-rc.5 (MIT).
+# Web presets preserve the rc.5 baseline; reviewed 0.2.3-alpha-only deltas are version-gated.
 - insert:
     - id: local-context-monitor
       name: dsh-context-monitor
@@ -129,6 +129,9 @@
         config:
           fetch: true
           searchTimeoutMs: 60000
+      - id: tool-cordis
+        name: '@deepseek-ai/dsh-tool-cordis'
+        disabled: !!js "!process.getBuiltinModule('node:module').createRequire(baseUrl)('@deepseek-ai/dsh/package.json').version.startsWith('0.2.3-')"
       - id: present
         name: '@deepseek-ai/dsh-tool-present'
       - id: tool-office
@@ -177,6 +180,7 @@
         name: '@deepseek-ai/dsh-tool-schedule'
       - id: skill-filesystem
         name: '@deepseek-ai/dsh-skill-filesystem'
+        config: !!js "process.getBuiltinModule('node:module').createRequire(baseUrl)('@deepseek-ai/dsh/package.json').version.startsWith('0.2.3-') ? { customSkillDirs: [process.getBuiltinModule('node:path').join(process.getBuiltinModule('node:path').dirname(process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('@deepseek-ai/dsh-agent-preset/package.json')), 'skills')] } : undefined"
       - id: tool-skill
         name: '@deepseek-ai/dsh-tool-skill'
       - id: command-goal
@@ -270,7 +274,7 @@
         name: '@deepseek-ai/dsh-tool-office'
       - id: tool-plugin-manager
         name: '@deepseek-ai/dsh-plugin-manager/tools'
-        disabled: true
+        disabled: !!js "!process.getBuiltinModule('node:module').createRequire(baseUrl)('@deepseek-ai/dsh/package.json').version.startsWith('0.2.3-') || !ctx.get('profileContext')"
       - id: tool-plugin-market
         name: '@deepseek-ai/dsh-plugin-market/tools'
         disabled: true
@@ -478,6 +482,7 @@
             - !!js process.getBuiltinModule('node:path').join(process.getBuiltinModule('node:path').dirname(process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('@deepseek-ai/dsh-agent-preset/package.json')), 'skills')
       - id: tool-skill
         name: '@deepseek-ai/dsh-tool-skill'
+        config: !!js "process.getBuiltinModule('node:module').createRequire(baseUrl)('@deepseek-ai/dsh/package.json').version.startsWith('0.2.3-') ? { excludedSkills: ['official-plugins', 'personalized-pages'] } : undefined"
       - id: present
         name: '@deepseek-ai/dsh-tool-present'
       - id: tool-plugin-manager

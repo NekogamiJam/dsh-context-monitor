@@ -1,6 +1,6 @@
 {
   "name": "dsh-context-monitor",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
@@ -53,17 +53,17 @@
   ],
   "engines": {
     "node": ">=24.9",
-    "dsh": "0.2.2-rc.5"
+    "dsh": "0.2.2-rc.5 || >=0.2.3-0 <0.2.3"
   },
   "peerDependencies": {
-    "@deepseek-ai/schemastery": "3.19.0",
-    "@deepseek-ai/dsh-compaction": "0.2.2-rc.5",
-    "@deepseek-ai/dsh-compaction-basic": "0.2.2-rc.5",
-    "@deepseek-ai/dsh-typert-protocol": "0.2.2-rc.5",
-    "@deepseek-ai/dsh-session": "0.2.2-rc.5",
-    "@deepseek-ai/dsh-llm": "0.2.2-rc.5",
-    "@deepseek-ai/dsh-tools": "0.2.2-rc.5",
-    "@deepseek-ai/dsh-settings": "0.2.2-rc.5"
+    "@deepseek-ai/schemastery": "3.19.0 || >=3.20.0-0 <3.20.0",
+    "@deepseek-ai/dsh-compaction": "0.2.2-rc.5 || >=0.2.3-0 <0.2.3",
+    "@deepseek-ai/dsh-compaction-basic": "0.2.2-rc.5 || >=0.2.3-0 <0.2.3",
+    "@deepseek-ai/dsh-typert-protocol": "0.2.2-rc.5 || >=0.2.3-0 <0.2.3",
+    "@deepseek-ai/dsh-session": "0.2.2-rc.5 || >=0.2.3-0 <0.2.3",
+    "@deepseek-ai/dsh-llm": "0.2.2-rc.5 || >=0.2.3-0 <0.2.3",
+    "@deepseek-ai/dsh-tools": "0.2.2-rc.5 || >=0.2.3-0 <0.2.3",
+    "@deepseek-ai/dsh-settings": "0.2.2-rc.5 || >=0.2.3-0 <0.2.3"
   },
   "dependencies": {
     "zod": "4.6.6"

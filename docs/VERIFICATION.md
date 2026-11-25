@@ -1,6 +1,18 @@
 # Verification and privacy notes
 
-## v0.2.0 verification
+## v0.2.1 release: rc.5 verification and alpha source review
+
+- The only runtime-supported and guaranteed host remains DSH `0.2.2-rc.5`. The package accepts `0.2.3-*` prereleases as an untested preview; **no alpha Host is installed, launched or tested**. DSH 0.2.3-alpha.1/alpha.2 source and manifests were reviewed against the code paths used here. The review found the `CompactionEngine` method family, native `surfaceOp.replace(startSeq,endSeq)`, SettingsForms `mutate`, agent-preset inspection and `conversation.view` contracts still present. `@deepseek-ai/dsh-typert-protocol/remote-info` remains exported; Schemastery `.volatile()` / transform behavior used by this plugin remains present in alpha.2's source.
+- Alpha.1/alpha.2 changes that affect packaging and presets are recorded in [COMPATIBILITY.md](COMPATIBILITY.md). In particular alpha.2 uses `@deepseek-ai/schemastery 3.20.0-alpha.1`, adds the `tool-cordis` standard-preset row and changes PTC/cordis skill settings. `cordis.patch.yml` makes only those reviewed `0.2.3-*` preset differences conditional on the Host package version; on rc.5 they resolve to the previous composition.
+- DSH alpha.2 itself requires Node `24.22.3+` in 24.x or `26.13.1+`. The plugin retains `engines.node: >=24.9` for the rc.5 baseline. This package range and static review do not establish alpha runtime compatibility, including for future prereleases.
+- No production Desktop installation was used to validate this package; the local v0.2.1 test archive was installed only in the disposable profile. The exact release archive is produced by the stable tag workflow and published identically to npm and GitHub Releases.
+
+- The rc.5 candidate was installed only in the disposable `artifacts/rc5-fake-provider-host` profile via the local DSH CLI, with no force flag or version exemption; the CLI accepted `dsh-context-monitor@0.2.1`. The isolated profile reported peer warnings, but resolved the runtime interfaces from its rc.5 Host.
+- On that isolated rc.5 Host, `scripts/acp-isolated-web-smoke.mjs --rpc-check` passed across `standard`, `ptc`, `minimal`, and `cordis`, including settings hot-toggle, actual backend reporting, `/compact` removal/restoration, and concurrent settings revision checks. The rc.5 preset expressions retained their original behavior.
+- The loopback fake-provider run with `--tiers` passed model-driven T1 compression, the ordinary fork's first provider request (summary included, shadowed marker omitted), T2/T3 lineage, overflow retry, and fail-closed handling of an invalid ledger. `--reopen` passed cold JSONL restart recovery, the first post-restart provider request, `decompress`, `search_context`, and `acp_status`.
+- `npm test`: **97/97 passed**; `npm run check` and `git diff --check` passed. The local package archive contains 30 runtime/documentation files. No alpha Host was launched; its compatibility remains untested and unguaranteed. The v0.2.1 validation did not install this version into the production Desktop; publication follows the stable tag workflow.
+
+## Historical v0.2.0 verification
 
 The monitoring projection is still read-only. A separate built-in engine provides ACP, with a profile-wide settings switch. Compatibility is restricted to rc.5. Prior v0.1.x Desktop tests below validate only the old monitoring integration, not the new engine or its settings UI. Automated integration fixtures use isolated profiles and synthetic data, not production sessions or real provider credentials.
 

@@ -1,10 +1,10 @@
 # 上下文监控 / DSH context monitor
 
-**`dsh-context-monitor` v0.2.0**提供只读监控，并可通过设置启用同包内置的 ACP 压缩后端（首装默认开启）。不需另装 `billion-context-dsh`。内置后端使用 [acp-kernel](https://github.com/ranxianglei/acp-kernel) 与 [billion-context](https://github.com/ranxianglei/billion-context)，基于 [Kiva 的 DSH 适配](https://github.com/Kiva007/billion-context-dsh/tree/v0.2.272)。
+**`dsh-context-monitor` v0.2.1** 提供只读监控，并可通过设置启用同包内置的 ACP 压缩后端（首装默认开启）。不需另装 `billion-context-dsh`。内置后端使用 [acp-kernel](https://github.com/ranxianglei/acp-kernel) 与 [billion-context](https://github.com/ranxianglei/billion-context)，基于 [Kiva 的 DSH 适配](https://github.com/Kiva007/billion-context-dsh/tree/v0.2.272)。
 
 ## DSH 版本兼容性
 
-v0.2.0 仅支持 **DSH 0.2.2-rc.5** 的 Desktop/Web 四个内置预设。内置后端依赖此版本的命令、配置和预设编排，而不只是 v0.1.x 的只读投影。不要用旧版监控报告或版本豁免推断兼容性。详见 [内置 ACP 设置、升级与测试边界](docs/BUILT-IN-ACP.md)。
+v0.2.1 的唯一运行时保证基线是 **DSH 0.2.2-rc.5** 的 Desktop/Web 四个内置预设。版本围栏也允许 0.2.3 预发布版本安装尝试，但只做过公开接口静态审查，**未在任何 DSH 0.2.3-* Host 实测，也不承诺 alpha 兼容**。DSH alpha.2 Host 还有更高的 Node 自身要求。详见 [内置 ACP 设置、升级与测试边界](docs/BUILT-IN-ACP.md)。
 
 ## 用法与功能
 
@@ -14,7 +14,7 @@ v0.2.0 仅支持 **DSH 0.2.2-rc.5** 的 Desktop/Web 四个内置预设。内置�
 
 在 DSH 插件管理器中任选一种安装来源（均含前端产物，无需构建脚本）：
 
-- **npm（推荐）：** `dsh-context-monitor`，也可用 `dsh-context-monitor@0.2.0` 固定版本。需要旧版只读监控时，请按兼容性说明选择 `dsh-context-monitor@0.1.7`。
+- **npm（推荐）：** `dsh-context-monitor@0.2.1`；如需旧版只读监控，请按兼容性说明选择 `dsh-context-monitor@0.1.7`。
 - **GitHub 源码：** 从 [Releases](https://github.com/NekogamiJam/dsh-context-monitor/releases) 选定标签后使用 `github:NekogamiJam/dsh-context-monitor#vX.Y.Z`。
 - **GitHub 预打包文件：** [下载最新稳定版安装包](https://github.com/NekogamiJam/dsh-context-monitor/releases/latest/download/dsh-context-monitor.tgz)。
 
@@ -70,7 +70,7 @@ npm run check
 
 生产依赖固定 `zod 4.6.6`，ACP 所用 DSH 接口通过宿主 peer 获取；开发测试另用 `semver 7.8.5`。安装无需执行构建脚本。前端使用宿主 ModuleLoader 和 React，无 CDN 或 iframe。
 
-v0.2.0 已在 rc.5 的隔离宿主做端到端测试，并在 Desktop 试用。它替换四个内置预设中的压缩后端和命令入口；不应与自定义预设补丁或其他压缩引擎叠加。请通过插件管理器安装，不要手改生产 profile 文件。
+v0.2.1 已在 DSH rc.5 的隔离宿主做假 provider 端到端验证；alpha 版本只做静态接口审查，不实机测试也不承诺兼容。它替换四个内置预设中的压缩后端和命令入口；不应与自定义预设补丁或其他压缩引擎叠加。请通过插件管理器安装，不要手改生产 profile 文件。
 
 卸载／回退：在插件管理器停用或删除 **上下文监控** bundle，不会改写会话历史。若要恢复独立压缩插件，先确认内置后端已停用，再单独启用它。开发目录安装后被 profile 链接引用，**不要移动或删除该目录**。
 

@@ -1,10 +1,12 @@
-# 内置 Active Context Pruning（v0.2.0）
+# 内置 Active Context Pruning（v0.2.1）
 
 上下文监控页的投影仍然只读。可选内置 ACP 是另一部分：它在启用时提供 `compress`、`decompress`、`search_context`、`acp_status`，使用 DSH 的原生表层替换与持久检查点。它不经 bili HTTP 代理，也不安装或调用独立 `billion-context-dsh` 包。
 
 ## 兼容范围与升级
 
-v0.2.0 只支持 **DSH 0.2.2-rc.5**、Node ≥24.9 以及该版本的 Desktop/Web 预设 `standard`、`ptc`、`minimal`、`cordis`。安装或替换包可能需要宿主重载；成功装载后，修改设置不需要重启。曾验证其他宿主的只读 v0.1.x 不等同于本版本。不要强装或使用版本豁免。
+v0.2.1 的**唯一实机验证及保证基线仍是 DSH 0.2.2-rc.5**、Node ≥24.9 和该版本 Desktop/Web 的 `standard`、`ptc`、`minimal`、`cordis` 预设。版本元数据允许 DSH `0.2.3-*` 预发布尝试；alpha.1/alpha.2 仅做公开源码和包清单静态审查，未安装或启动 alpha Host，**不承诺 alpha 兼容**。未来 alpha 和 0.2.3 stable 也不在保证范围。alpha.2 的 DSH Host 自身要求 Node 24.22.3+（24.x）或 26.13.1+；插件的 Node floor 保持 24.9，以免丢失 rc.5。
+
+`cordis.patch.yml` 保留 rc.5 预设基线；只在 Host 报告 `0.2.3-*` 时加入 alpha.2 的预设配置差异。Host 版本判断不等于 alpha 运行验证。不要把版本围栏接受或源码相似当成通过测试；alpha 使用请限于可丢弃的 profile，并预期行为可能不同。不要强装或使用版本豁免。
 
 **不要与独立 `billion-context-dsh`、旧 bili 或其他压缩插件并装启用。** 如果已经安装独立后端，先按宿主界面停用或移除，再单独验证本候选。检测到在用的其他后端、无法接管的预设或旧预设修订时，显示原因而不是强行覆盖用户配置。监控独立工作；关闭内置引擎后，受管理预设恢复 DSH 原生压缩和 `/compact`。
 
@@ -32,4 +34,4 @@ v0.2.0 只支持 **DSH 0.2.2-rc.5**、Node ≥24.9 以及该版本的 Desktop/We
 
 ## 归属
 
-本插件使用 [acp-kernel](https://github.com/ranxianglei/acp-kernel) 和 [billion-context](https://github.com/ranxianglei/billion-context)。DSH 适配基于 [Kiva v0.2.272](https://github.com/Kiva007/billion-context-dsh/tree/v0.2.272)，内核固定为 `0.0.198`；随包提供源版本、版权、许可证与修改说明。预设组基于 MIT 许可的 [DeepSeek Harness 0.2.2-rc.5](https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.2-rc.5)，其他组维持原样。
+本插件使用 [acp-kernel](https://github.com/ranxianglei/acp-kernel) 和 [billion-context](https://github.com/ranxianglei/billion-context)。DSH 适配基于 [Kiva v0.2.272](https://github.com/Kiva007/billion-context-dsh/tree/v0.2.272)，内核固定为 `0.0.198`；随包提供源版本、版权、许可证与修改说明。预设基线基于 MIT 许可的 [DeepSeek Harness 0.2.2-rc.5](https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.2-rc.5)；alpha-only 预设差异仅按公开配置做条件适配，未经 alpha Host 验证。

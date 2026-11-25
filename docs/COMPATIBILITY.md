@@ -1,10 +1,30 @@
 # DSH compatibility / DSH 版本兼容性
 
-## v0.2.0: exact host revision
+## v0.2.1：已验证基线与预发布试用范围
 
-The built-in ACP changes host preset composition and adds a settings and command adapter. Its declaration is **DSH 0.2.2-rc.5 only**, for the four shipped Desktop/Web presets, with **Node ≥24.9**. A version exemption is not a supported installation path. See [built-in ACP](BUILT-IN-ACP.md) for setup and boundaries.
+内置 ACP 在 v0.2.1 保持 **DSH 0.2.2-rc.5** 为唯一运行时测试且保证兼容的宿主。版本围栏也允许安装并尝试 DSH `0.2.3-*` 预发布版，但**没有任何 0.2.3 预发布版经过安装或运行时测试，兼容性不作保证**。 This includes future 0.2.3 alphas beyond the source-reviewed tags. DSH 0.2.2 stable and 0.2.3 stable are intentionally outside the declared range pending separate review.
 
-The remainder of this document describes the historical **read-only v0.1.x** monitor and does not widen v0.2.0's compatibility declaration.
+The manifest range is:
+
+```text
+0.2.2-rc.5 || >=0.2.3-0 <0.2.3
+```
+
+Each direct DSH peer uses that same range. `@deepseek-ai/schemastery` accepts `3.19.0` (rc.5) or the `3.20.0` prerelease line (the reviewed alpha.2 tag uses `3.20.0-alpha.1`). The plugin's Node engine remains `>=24.9` to preserve rc.5. **The DSH 0.2.3-alpha.2 Host itself** requires Node `24.22.3+` within 24.x, or `26.13.1+`.
+
+### Alpha source review only / alpha 仅静态审查
+
+The official [0.2.3-alpha.1 notes](https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.3-alpha.1) describe Cordis Core 4 / Loader / Include changes, new plugin configuration visibility and live volatile sync, module export cleanup, CSS module output changes, and the session-status package move. The [alpha.2 notes](https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.3-alpha.2) raise the Host Node requirement. Source-reviewed rc.5-to-alpha.2 contracts retain the `CompactionEngine` method family, `surfaceOp.replace` with `startSeq`/`endSeq`, SettingsForms `mutate`, agent-preset inspection, the Typert `remote-info` public export, and the `conversation.view` slot used here. Schemastery 3.20.0-alpha.1 retains the `.volatile()` and transform semantics used by this plugin. These are source/manifest findings, **not a runtime test or support guarantee**.
+
+The copied rc.5 Web preset configuration differs from alpha.2 in a few rows: `standard` adds `tool-cordis`; `ptc` adds the bundled skill path and conditional plugin-manager access; `cordis` excludes two built-in skills from the `/skill` tool. These preview-only rows/config values are gated on the Host's `0.2.3-*` package version so rc.5 keeps its prior preset behavior. Custom compositions and later alpha changes remain outside the guarantee. The plugin uses its own inline CSS, not Host CSS Modules, and does not consume the moved session-status UI package.
+
+No alpha Host is launched for this project. Before relying on ACP on any `0.2.3-*` build, assume it may fail or behave differently; use a disposable profile and report any failure rather than treating this preview range as proof. The verified baseline remains rc.5.
+
+## v0.2.0: rc.5 exact-host release
+
+The built-in ACP changes host preset composition and adds a settings and command adapter. v0.2.0 declared **DSH 0.2.2-rc.5 only**, for the four shipped Desktop/Web presets, with **Node ≥24.9**. It was exercised on rc.5 in isolated fake-provider tests and in Desktop use. This historical verification does not extend to alpha builds. See [built-in ACP](BUILT-IN-ACP.md) for setup and boundaries.
+
+The remainder of this document describes the historical **read-only v0.1.x** monitor and does not widen the built-in engine's tested compatibility.
 
 ## v0.1.x: declared range / 旧版声明范围
 
